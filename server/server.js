@@ -161,13 +161,24 @@ for (const key of requiredEnv) {
 }
 
 // ➡️ UPDATED: Consolidated all table creation logic into one clean function
-const pool = new pg.Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
+// Replace the existing pg.Pool configuration in server.js with this
+
+const pool = new pg.Pool(
+    process.env.DATABASE_URL ? {
+        // This configuration is used for production environments like Render
+        connectionString: process.env.DATABASE_URL,
+        ssl: {
+            rejectUnauthorized: false
+        }
+    } : {
+        // This configuration is used for your local development environment
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: process.env.DB_PORT,
+    }
+);
 
 const initializeDatabase = async () => {
     // UPDATED: Added the created_at column to the main table definition
