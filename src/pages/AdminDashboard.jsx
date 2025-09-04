@@ -21,8 +21,8 @@ const AdminDashboard = ({ token }) => {
         setIsLoading(true);
         try {
             const [overviewRes, usersRes] = await Promise.all([
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/admin/overview', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/overview`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
             
             if (!overviewRes.ok) throw new Error('Failed to fetch admin overview. Ensure you have admin privileges.');

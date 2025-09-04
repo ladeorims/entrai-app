@@ -25,8 +25,8 @@ const MarketingDashboard = ({ token }) => {
         setIsLoading(true);
         try {
             const [summaryRes, contentRes] = await Promise.all([
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/marketing/summary', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/content-calendar', { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/marketing/summary`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
             const summaryData = await summaryRes.json();
             const contentData = await contentRes.json();
@@ -44,7 +44,7 @@ const MarketingDashboard = ({ token }) => {
     const handleAddCampaign = async (e) => {
         e.preventDefault();
         try {
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newCampaign) });
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/campaigns`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newCampaign) });
             setIsCampaignModalVisible(false);
             fetchData();
         } catch (error) { console.error("Failed to add campaign:", error); }
@@ -53,7 +53,7 @@ const MarketingDashboard = ({ token }) => {
     const handleAddContent = async (e) => {
         e.preventDefault();
         try {
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/content-calendar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
             setIsContentModalVisible(false);
             fetchData();
         } catch (error) { console.error("Failed to add content:", error); }
@@ -63,7 +63,7 @@ const MarketingDashboard = ({ token }) => {
         if (!aiState.topic) return;
         setAiState(p => ({ ...p, isLoading: true, idea: '' }));
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/ai/generate-post-idea', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ topic: aiState.topic, tone: aiState.tone }) });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/generate-post-idea`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ topic: aiState.topic, tone: aiState.tone }) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message);
             setAiState(p => ({ ...p, idea: data.postIdea, isLoading: false }));

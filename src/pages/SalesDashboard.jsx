@@ -49,7 +49,7 @@ const SmartPromptModal = ({ deal, actions, onAction, onClose, successMessage, se
     );
 };
 
-// eslint-disable-next-line no-unused-vars
+// /* eslint-disable-next-line no-unused-vars*/
 const SalesDashboard = ({ token, setActiveView }) => {
     const [salesData, setSalesData] = useState([]);
     const [salesPipeline, setSalesPipeline] = useState({});
@@ -76,7 +76,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
         if (!token) { setLoading(false); return; }
         setLoading(true);
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/deals', { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/deals`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!response.ok) throw new Error('Failed to fetch sales data');
             const data = await response.json();
             const pipeline = salesStages.reduce((acc, stage) => {
@@ -104,7 +104,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
     const fetchClients = useCallback(async () => {
         if (!token) return;
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/clients', { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/clients`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (response.ok) {
                 const clientData = await response.json();
                 setClients(clientData);
@@ -184,7 +184,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
             let nextActions = []; // NEW: Initialize nextActions array
 
             if (isCreatingClient) {
-                const clientRes = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/clients', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newClient) });
+                const clientRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/clients`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newClient) });
                 if (!clientRes.ok) { const errorData = await clientRes.json(); throw new Error(errorData.message || 'Failed to create client.'); }
                 
                 const result = await clientRes.json();
@@ -196,7 +196,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
             }
             
             const dealPayload = { ...newDeal, client_id: clientData.id, name: newDeal.name || clientData.company_name || clientData.name };
-            const dealRes = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/deals', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(dealPayload) });
+            const dealRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/deals`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(dealPayload) });
             if (!dealRes.ok) { const errorData = await dealRes.json(); throw new Error(errorData.message || 'Failed to create deal.'); }
             const newDealData = await dealRes.json();
 
@@ -324,7 +324,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
         setAiModalState(prev => ({ ...prev, sendStatus: 'Sending email...' }));
         const emailSubject = `${aiModalState.title.replace('Generate ', '')} for ${deal.name}`;
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ clientEmail: deal.client_email, subject: emailSubject, body: aiModalState.generatedContent, clientId: deal.client_id }) });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ clientEmail: deal.client_email, subject: emailSubject, body: aiModalState.generatedContent, clientId: deal.client_id }) });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || 'Failed to send email.'); }
             setAiModalState(prev => ({ ...prev, sendStatus: 'Email sent successfully!' }));
         } catch (error) {
@@ -374,7 +374,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
                 priority: 'High',
                 dueDate: null
             };
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks', {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(task)
@@ -390,7 +390,7 @@ const SalesDashboard = ({ token, setActiveView }) => {
                 priority: 'Medium',
                 dueDate: null
             };
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks', {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(task)

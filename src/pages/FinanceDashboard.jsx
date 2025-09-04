@@ -1,4 +1,4 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, ExternalLink, PlusCircle, Wand2, XCircle, Loader2, Trash2, FileText, Download, Send, Save, Edit, Check, AlertTriangle, CreditCard } from 'lucide-react';
@@ -75,8 +75,8 @@ const FinanceDashboard = ({ token, user }) => {
             const [summaryRes, invoicesRes, clientsRes, alertsRes] = await Promise.all([
                 fetch(`${import.meta.env.VITE_API_BASE_URL}/api/finance/summary?period=${filterPeriod}`, { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices?search=${invoiceSearchTerm}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/clients', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/alerts/overdue-invoices', { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/clients`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/alerts/overdue-invoices`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
             setSummaryData(await summaryRes.json());
             setInvoices(await invoicesRes.json());
@@ -117,7 +117,7 @@ const FinanceDashboard = ({ token, user }) => {
     const handleAddTransaction = async (e) => {
         e.preventDefault();
         try {
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ ...newTransaction, amount: parseFloat(newTransaction.amount) }) });
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ ...newTransaction, amount: parseFloat(newTransaction.amount) }) });
             setIsTransactionModalVisible(false);
             setNewTransaction({ title: '', amount: '', type: 'expense', category: '', transaction_date: new Date().toISOString().split('T')[0] });
             fetchData();
@@ -137,7 +137,7 @@ const handleInvoiceAction = async (action) => {
     setActionStatus('Processing...');
     try {
         // Step 1: Always create the invoice first to get an ID
-        const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/invoices', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(newInvoice)
@@ -293,7 +293,7 @@ const handleInvoiceAction = async (action) => {
         setIsAiLoading(true);
         setAiAnalysis('');
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/ai/analyze-finances', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ summary: summaryData }) });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/analyze-finances`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ summary: summaryData }) });
             if (!response.ok) throw new Error('Failed to get AI analysis');
             const data = await response.json();
             setAiAnalysis(data.analysis);

@@ -14,7 +14,7 @@ const PaymentPage = ({ plan, token }) => {
     const handleProceedToPayment = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/subscriptions/create-checkout-session', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/subscriptions/create-checkout-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

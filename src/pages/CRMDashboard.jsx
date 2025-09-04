@@ -80,7 +80,7 @@ const CRMDashboard = ({ token }) => {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/crm/clients', { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/crm/clients`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!response.ok) throw new Error('Failed to fetch clients');
             const data = await response.json();
             setClients(data);

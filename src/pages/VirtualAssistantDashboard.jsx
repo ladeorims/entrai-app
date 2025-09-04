@@ -1,4 +1,4 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckSquare, Calendar, Mail, FileText, Trash2, XCircle, PlusCircle, Loader2, Wand2, AlertTriangle, RotateCcw } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -28,7 +28,7 @@ const VirtualAssistantDashboard = ({ token }) => {
         if (!token) { setIsLoading(false); return; }
         setIsLoading(true);
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks', { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!response.ok) throw new Error('Failed to fetch tasks');
             const data = await response.json();
             setCurrentTasks(data);
@@ -48,7 +48,7 @@ const VirtualAssistantDashboard = ({ token }) => {
         e.preventDefault();
         if (!newTask.title.trim()) return;
         try {
-            await fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks', {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -112,7 +112,7 @@ const VirtualAssistantDashboard = ({ token }) => {
         if (!summaryState.inputText.trim()) return;
         setSummaryState(prev => ({ ...prev, isLoading: true, summaryText: '' }));
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/ai/summarize', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/summarize`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ text: summaryState.inputText })
@@ -133,7 +133,7 @@ const VirtualAssistantDashboard = ({ token }) => {
         if (!emailState.prompt.trim()) return;
         setEmailState(prev => ({ ...prev, isLoading: true, generatedBody: '' }));
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/ai/draft-email', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/draft-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ prompt: emailState.prompt })
@@ -153,7 +153,7 @@ const VirtualAssistantDashboard = ({ token }) => {
     const handleSendEmail = async () => {
         setEmailState(prev => ({ ...prev, sendStatus: 'Sending...', isLoading: true }));
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -233,7 +233,7 @@ const VirtualAssistantDashboard = ({ token }) => {
         const prompt = `Draft a professional meeting invitation email. The meeting is titled "${title}", scheduled for ${date} from ${startTime} to ${endTime}. Additional details: ${description}`;
         setMeetingState(p => ({ ...p, isLoading: true }));
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/ai/draft-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ prompt }) });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/draft-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ prompt }) });
             if (!response.ok) { const err = await response.json(); throw new Error(err.message); }
             const result = await response.json();
             setMeetingState(p => ({ ...p, generatedEmail: result.emailBody, isLoading: false }));
@@ -247,7 +247,7 @@ const VirtualAssistantDashboard = ({ token }) => {
     const openTrashModal = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks/trash', { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks/trash`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!response.ok) throw new Error('Failed to fetch trashed tasks');
             const data = await response.json();
             setTrashedTasks(data);

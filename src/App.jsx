@@ -72,7 +72,7 @@ const App = () => {
     const fetchNotifications = useCallback(async (currentToken) => {
         if (!currentToken) return;
         try {
-            const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/notifications', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${currentToken}` }
             });
             if (response.ok) {
@@ -88,7 +88,7 @@ const App = () => {
         const fetchUserProfile = async (currentToken) => {
             if (currentToken) {
                 try {
-                    const response = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/profile', { headers: { 'Authorization': `Bearer ${currentToken}` } });
+                    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
                     if (response.ok) {
                         const profileData = await response.json();
                         setUser(profileData);
@@ -163,7 +163,7 @@ const App = () => {
     const handleAuth = async (authData, mode) => {
         setIsLoading(true);
         setAuthMessage({ type: '', text: '' });
-        const url = mode === 'login' ? '${import.meta.env.VITE_API_BASE_URL}/api/login' : '${import.meta.env.VITE_API_BASE_URL}/api/signup';
+        const url = mode === 'login' ? `${import.meta.env.VITE_API_BASE_URL}/api/login` : `${import.meta.env.VITE_API_BASE_URL}/api/signup`;
         try {
             const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authData) });
             const data = await response.json();

@@ -65,9 +65,9 @@ const Dashboard = ({ setActiveView, token, user }) => {
         setIsLoading(true);
         try {
             const [overviewRes, tasksRes, activityRes] = await Promise.all([
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/dashboard/overview', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/tasks', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('${import.meta.env.VITE_API_BASE_URL}/api/dashboard/recent-activity', { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/dashboard/overview`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/dashboard/recent-activity`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
 
             if (!overviewRes.ok || !tasksRes.ok || !activityRes.ok) throw new Error('Failed to fetch dashboard data');

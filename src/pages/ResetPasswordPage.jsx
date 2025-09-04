@@ -30,7 +30,7 @@ const ResetPasswordPage = ({ setActiveView, setAuthMessage }) => {
         setIsLoading(true);
         setMessage({ type: '', text: '' });
         try {
-            const res = await fetch('${import.meta.env.VITE_API_BASE_URL}/api/reset-password', {
+            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, password }),
