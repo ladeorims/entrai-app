@@ -1,0 +1,19 @@
+<!-- public/favicon.svg -->
+<svg 
+    width="32" 
+    height="32" 
+    viewBox="0 0 32 32" 
+    xmlns="http://www.w3.org/2000/svg"
+>
+    <defs>
+        <linearGradient id="faviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#4A90E2;" />
+            <stop offset="100%" style="stop-color:#9013FE;" />
+        </linearGradient>
+    </defs>
+    <!-- UPDATED: Bolder SVG path that fills more space -->
+    <path 
+        fill="url(#faviconGradient)" 
+        d="M4 4 H 28 V 9 H 4 V 4 M 4 13.5 H 24 V 18.5 H 4 V 13.5 M 4 23 H 28 V 28 H 4 V 23"
+    />
+</svg>

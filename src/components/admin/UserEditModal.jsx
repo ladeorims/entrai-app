@@ -1,0 +1,94 @@
+// src/components/admin/UserEditModal.jsx
+
+import React, { useState } from 'react';
+import Card from '../ui/Card';
+import { XCircle, KeyRound, Power, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
+
+const UserEditModal = ({ user, token, onClose, onUpdate }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
+
+    const handleAction = async (endpoint, method = 'POST', body = {}) => {
+        setIsLoading(true);
+        setActionMessage({ type: '', text: '' });
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users/${user.id}/${endpoint}`, {
+                method,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body)
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message);
+            setActionMessage({ type: 'success', text: result.message });
+            onUpdate(); // Refresh the user list in the parent component
+        } catch (err) {
+            setActionMessage({ type: 'error', text: err.message || 'Action failed.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const isDeactivated = user.subscriptionStatus === 'deactivated';
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <Card className="max-w-lg w-full relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-text-secondary dark:text-dark-text-secondary hover:opacity-70">
+                    <XCircle />
+                </button>
+                <div>
+                    <h2 className="text-2xl font-bold">{user.name}</h2>
+                    <p className="text-text-secondary dark:text-dark-text-secondary">{user.email}</p>
+                </div>
+                
+                <div className="border-t border-slate-200 dark:border-slate-700 my-6"></div>
+
+                <div className="space-y-4">
+                    <h3 className="font-semibold">Support Actions</h3>
+                    <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-between">
+                        <div>
+                            <p className="font-medium">Manually Verify User's Email</p>
+                            <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Force-verify the user's email if they can't find the link.</p>
+                        </div>
+                        <button onClick={() => handleAction('verify', 'PUT')} disabled={isLoading} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
+                            {isLoading ? <Loader2 className="animate-spin" size={16}/> : <ShieldCheck size={16} />}
+                            Verify
+                        </button>
+                    </div>
+                    <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-between">
+                        <div>
+                            <p className="font-medium">Trigger Password Reset</p>
+                            <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Send a secure password reset link to the user's email.</p>
+                        </div>
+                        <button onClick={() => handleAction('trigger-reset', 'POST')} disabled={isLoading} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
+                            {isLoading ? <Loader2 className="animate-spin" size={16}/> : <KeyRound size={16} />}
+                            Send Link
+                        </button>
+                    </div>
+                    <div className={`p-4 rounded-lg flex items-center justify-between ${isDeactivated ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                        <div>
+                            <p className={`font-medium ${isDeactivated ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                                {isDeactivated ? 'Reactivate Account' : 'Deactivate Account'}
+                            </p>
+                            <p className={`text-xs ${isDeactivated ? 'text-green-600/80 dark:text-green-400/80' : 'text-red-600/80 dark:text-red-400/80'}`}>
+                                {isDeactivated ? 'Allow this user to log in again.' : 'This will prevent the user from logging in.'}
+                            </p>
+                        </div>
+                        <button onClick={() => handleAction('status', 'PUT', { status: isDeactivated ? 'active' : 'deactivated' })} className={`${isDeactivated ? 'bg-green-200/50 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900' : 'bg-red-200/50 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900'} font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2`}>
+                           <Power size={16} /> {isDeactivated ? 'Reactivate' : 'Deactivate'}
+                        </button>
+                    </div>
+                </div>
+
+                {actionMessage.text && (
+                    <div className={`mt-4 text-sm flex items-center gap-2 ${actionMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                       {actionMessage.type === 'success' && <CheckCircle size={16} />}
+                       <span>{actionMessage.text}</span>
+                    </div>
+                )}
+            </Card>
+        </div>
+    );
+};
+
+export default UserEditModal;
