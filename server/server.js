@@ -719,22 +719,23 @@ app.put('/api/admin/users/:id/verify', authenticateToken, requireAdmin, async (r
         await pool.query('UPDATE users SET is_verified = TRUE WHERE id = $1', [id]);
         res.status(200).json({ message: 'User successfully verified.' });
     } catch (err) {
-        console.error('Error triggering password reset:', err);
+        console.error('Error verifying user:', err);
         res.status(500).json({ message: 'Server error.' });
     }
 });
 
-app.put('/api/admin/users/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/admin/users/:id/plan', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; // e.g., 'active', 'deactivated'
+    const { planType } = req.body;
     try {
-        await pool.query('UPDATE users SET subscription_status = $1 WHERE id = $2', [status, id]);
-        res.status(200).json({ message: `User status updated to ${status}.` });
+        await pool.query('UPDATE users SET plan_type = $1 WHERE id = $2', [planType, id]);
+        res.status(200).json({ message: `User plan changed to ${planType}.` });
     } catch (err) {
-        console.error('Error triggering password reset:', err);
+        console.error('Error updating user plan:', err);
         res.status(500).json({ message: 'Server error.' });
     }
 });
+
 
 // =========================================================================
 // SALES & CLIENTS API ROUTES

@@ -1,12 +1,15 @@
 // src/components/admin/UserEditModal.jsx
 
-import React, { useState } from 'react';
+import React, {useState} from 'react'
 import Card from '../ui/Card';
-import { XCircle, KeyRound, Power, Loader2, CheckCircle, ShieldCheck } from 'lucide-react';
+import { XCircle, KeyRound, Power, Loader2, CheckCircle, ShieldCheck, Save } from 'lucide-react';
+
+const formSelectClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid form-select";
 
 const UserEditModal = ({ user, token, onClose, onUpdate }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
+    const [newPlan, setNewPlan] = useState(user.planType);
 
     const handleAction = async (endpoint, method = 'POST', body = {}) => {
         setIsLoading(true);
@@ -37,7 +40,7 @@ const UserEditModal = ({ user, token, onClose, onUpdate }) => {
                     <XCircle />
                 </button>
                 <div>
-                    <h2 className="text-2xl font-bold">{user.name}</h2>
+                    <h2 className="text-2xl font-bold">{user.name || 'No Name Provided'}</h2>
                     <p className="text-text-secondary dark:text-dark-text-secondary">{user.email}</p>
                 </div>
                 
@@ -45,34 +48,47 @@ const UserEditModal = ({ user, token, onClose, onUpdate }) => {
 
                 <div className="space-y-4">
                     <h3 className="font-semibold">Support Actions</h3>
-                    <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-between">
-                        <div>
-                            <p className="font-medium">Manually Verify User's Email</p>
-                            <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Force-verify the user's email if they can't find the link.</p>
+                    
+                    {!user.isVerified && (
+                        <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-between">
+                            <div>
+                                <p className="font-medium">Manually Verify User's Email</p>
+                                <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Force-verify this user if they can't find the email link.</p>
+                            </div>
+                            <button onClick={() => handleAction('verify', 'PUT')} disabled={isLoading} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
+                                {isLoading ? <Loader2 className="animate-spin" size={16}/> : <ShieldCheck size={16} />} Verify
+                            </button>
                         </div>
-                        <button onClick={() => handleAction('verify', 'PUT')} disabled={isLoading} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
-                            {isLoading ? <Loader2 className="animate-spin" size={16}/> : <ShieldCheck size={16} />}
-                            Verify
-                        </button>
-                    </div>
+                    )}
+
                     <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-between">
                         <div>
                             <p className="font-medium">Trigger Password Reset</p>
                             <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Send a secure password reset link to the user's email.</p>
                         </div>
                         <button onClick={() => handleAction('trigger-reset', 'POST')} disabled={isLoading} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
-                            {isLoading ? <Loader2 className="animate-spin" size={16}/> : <KeyRound size={16} />}
-                            Send Link
+                            {isLoading ? <Loader2 className="animate-spin" size={16}/> : <KeyRound size={16} />} Send Link
                         </button>
                     </div>
+
+                    <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg">
+                        <p className="font-medium mb-2">Change Plan</p>
+                        <div className="flex items-center gap-2">
+                           <select value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className={formSelectClasses}>
+                                <option value="free">Starter (Free)</option>
+                                <option value="solo">Solo</option>
+                                <option value="team">Team</option>
+                           </select>
+                           <button onClick={() => handleAction('plan', 'PUT', { planType: newPlan })} disabled={isLoading || newPlan === user.planType} className="bg-slate-200 dark:bg-slate-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2 disabled:opacity-50">
+                                <Save size={16}/> Save
+                           </button>
+                        </div>
+                    </div>
+
                     <div className={`p-4 rounded-lg flex items-center justify-between ${isDeactivated ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
                         <div>
-                            <p className={`font-medium ${isDeactivated ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                                {isDeactivated ? 'Reactivate Account' : 'Deactivate Account'}
-                            </p>
-                            <p className={`text-xs ${isDeactivated ? 'text-green-600/80 dark:text-green-400/80' : 'text-red-600/80 dark:text-red-400/80'}`}>
-                                {isDeactivated ? 'Allow this user to log in again.' : 'This will prevent the user from logging in.'}
-                            </p>
+                            <p className={`font-medium ${isDeactivated ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{isDeactivated ? 'Reactivate Account' : 'Deactivate Account'}</p>
+                            <p className={`text-xs ${isDeactivated ? 'text-green-600/80 dark:text-green-400/80' : 'text-red-600/80 dark:text-red-400/80'}`}>{isDeactivated ? 'Allow this user to log in again.' : 'This will prevent the user from logging in.'}</p>
                         </div>
                         <button onClick={() => handleAction('status', 'PUT', { status: isDeactivated ? 'active' : 'deactivated' })} className={`${isDeactivated ? 'bg-green-200/50 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900' : 'bg-red-200/50 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900'} font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2`}>
                            <Power size={16} /> {isDeactivated ? 'Reactivate' : 'Deactivate'}

@@ -1,7 +1,7 @@
 /* eslint-disable no-irregular-whitespace */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { Search, LayoutDashboard, DollarSign, Bot, Megaphone, Briefcase, Settings, LogOut, ChevronLeft, ChevronRight, Sun, Star, Moon, Bell, AlertTriangle, XCircle, ShieldCheck, Users } from 'lucide-react';
+import { Search, LayoutDashboard, DollarSign, Bot, Megaphone, Briefcase, Settings, LogOut, ChevronLeft, ChevronRight, Sun, Star, Moon, Bell, AlertTriangle, XCircle, ShieldCheck, Users, Menu } from 'lucide-react';
 import NavItem from './components/layout/NavItem';
 import AnimatedLogo from './components/AnimatedLogo';
 import OnboardingModal from './components/OnboardingModal';
@@ -46,6 +46,7 @@ const App = () => {
     const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
     const [isResetPasswordView, setIsResetPasswordView] = useState(false);
     const [publicPageView, setPublicPageView] = useState('Landing'); // NEW: Controls which public page is visible
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -236,8 +237,7 @@ const App = () => {
                 case 'Virtual Assistant': return <VirtualAssistantDashboard token={token} />;
                 case 'Marketing': return <MarketingDashboard token={token} />;
                 case 'Finance': return <FinanceDashboard token={token} user={user} />;
-                case 'Profile': return <ProfilePage user={user} setUser={setUser} token={token} setActiveView={setActiveView} onSelectPlan={handleSelectPlan} />;
-                case 'Settings': return <SettingsPage user={user} />;
+                case 'Profile': return <ProfilePage user={user} setUser={setUser} token={token} setActiveView={setActiveView} onSelectPlan={handleSelectPlan} />;                case 'Settings': return <SettingsPage user={user} />;
                 case 'Payment': return <PaymentPage plan={selectedPlan} token={token} />; 
                 case 'Admin': return <AdminDashboard token={token} />;
                 default: return <Dashboard setActiveView={setActiveView} token={token} user={user} />;
@@ -251,16 +251,10 @@ const App = () => {
 
 
      if (isLoggedIn) {
-            return (
-            
-            <div className={`flex h-screen font-sans bg-primary-bg text-text-primary dark:bg-dark-primary-bg dark:text-dark-text-primary`}> 
-                    {isUpgradeModalVisible && <UpgradeModal onSelectPlan={handleSelectPlan} onClose={() => setIsUpgradeModalVisible(false)} />}                   
-                     {isOnboardingVisible && <OnboardingModal user={user} token={token} onComplete={handleOnboardingComplete} />}
-                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[150%] bg-gradient-to-br from-white via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-purple-900/20 blur-3xl"></div>
-                    </div>
-                <aside className={`flex flex-col bg-card-bg/80 dark:bg-dark-card-bg/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
-                    <div className="flex items-center p-4 h-[89px] border-b border-slate-200 dark:border-slate-800">
+
+            const sidebarContent = (
+            <>
+                <div className="flex items-center p-4 h-[89px] border-b border-slate-200 dark:border-slate-800">
                         <a href="#" onClick={() => setActiveView('Dashboard')} className="flex items-center gap-2 w-full">
                             <AnimatedLogo isCollapsed={isSidebarCollapsed} />                            
                             {/* {!isSidebarCollapsed && <h1 className="text-2xl font-bold font-logo hero-gradient-text tracking-wider whitespace-nowrap">Entrai</h1>} */}
@@ -296,10 +290,32 @@ const App = () => {
                             <NavItem icon={LogOut} label="Logout" view="Logout" activeView={activeView} isCollapsed={isSidebarCollapsed} setActiveView={handleLogout} />
                         </ul>
                     </div>
+            </>
+        );
+            return (
+            
+            <div className={`flex h-screen font-sans bg-primary-bg text-text-primary dark:bg-dark-primary-bg dark:text-dark-text-primary`}> 
+                    {isUpgradeModalVisible && <UpgradeModal onSelectPlan={handleSelectPlan} onClose={() => setIsUpgradeModalVisible(false)} />}                   
+                     {isOnboardingVisible && <OnboardingModal user={user} token={token} onComplete={handleOnboardingComplete} />}
+                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[150%] bg-gradient-to-br from-white via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-purple-900/20 blur-3xl"></div>
+                    </div>
+                <aside className={`flex flex-col bg-card-bg/80 dark:bg-dark-card-bg/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+                    {sidebarContent}
                     <button onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-8 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white p-1.5 rounded-full shadow-lg hover:opacity-90 transition-opacity">
                         {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                     </button>
                 </aside>
+
+                {/* Mobile Sidebar (Overlay) */}
+                {isMobileMenuOpen && (
+                    <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setIsMobileMenuOpen(false)}>
+                        <aside className="fixed top-0 left-0 h-full w-64 flex flex-col bg-card-bg/95 dark:bg-dark-card-bg/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 z-50">
+                            {sidebarContent}
+                        </aside>
+                    </div>
+                )}
+
                 <main className="flex-1 flex flex-col overflow-hidden">
                     <header className={`flex items-center justify-between p-6 ${isDarkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-white/80 border-slate-200'} backdrop-blur-sm border-b`}>
                         <div className="relative w-1/3">
