@@ -213,7 +213,18 @@ const initializeDatabase = async () => {
     const invoiceLineItemsTableQuery = `CREATE TABLE IF NOT EXISTS invoice_line_items (id SERIAL PRIMARY KEY, invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE, description TEXT NOT NULL, quantity NUMERIC(10, 2) NOT NULL, unit_price NUMERIC(12, 2) NOT NULL, total NUMERIC(12, 2) NOT NULL)`;
     const automationsTableQuery = `CREATE TABLE IF NOT EXISTS automations (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, trigger_type VARCHAR(100) NOT NULL, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
     const automationActionsTableQuery = `CREATE TABLE IF NOT EXISTS automation_actions (id SERIAL PRIMARY KEY, automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE, action_type VARCHAR(100) NOT NULL, params JSONB)`;
-    
+    const clientInteractionsTableQuery = `
+        CREATE TABLE IF NOT EXISTS client_interactions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL, -- Optional link to a deal
+            type VARCHAR(50) NOT NULL, -- e.g., 'email', 'note', 'call'
+            content TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    `;
+
     // UPDATED: Also added created_at here to ensure it gets added to existing tables
     const alterUsersTableQuery = `
         ALTER TABLE users
@@ -246,7 +257,7 @@ const initializeDatabase = async () => {
         await pool.query(invoiceLineItemsTableQuery);
         await pool.query(automationsTableQuery);
         await pool.query(automationActionsTableQuery);
-        
+        await pool.query(clientInteractionsTableQuery);
         await pool.query(alterUsersTableQuery);
         await pool.query(alterInvoicesQuery);
 
@@ -1237,42 +1248,51 @@ app.post('/api/ai/generate-leads', authenticateToken, async (req, res) => {
 
 // POST endpoint to send a generated email to a client.
 app.post('/api/sales/send-email', authenticateToken, async (req, res) => {
-    const { clientEmail, subject, body, clientId } = req.body;
-    // ➡️ UPDATED: Removed unused 'name' and 'company' variables
+    const { recipientEmail, subject, body, clientId, newClientName } = req.body;
     const { userId } = req.user;
-
-    if (!clientEmail || !subject || !body || !clientId) {
-        return res.status(400).json({ message: 'Client email, subject, body, and client ID are required.' });
-    }
+    const client = await pool.connect();
 
     try {
-        const clientResult = await pool.query('SELECT email FROM clients WHERE id = $1 AND user_id = $2', [clientId, userId]);
-        if (clientResult.rows.length === 0) {
-            return res.status(404).json({ message: 'Client not found or user not authorized.' });
+        await client.query('BEGIN');
+        let finalClientId = clientId;
+
+        // If it's a new client, create them first
+        if (!finalClientId && newClientName && recipientEmail) {
+            const newClientRes = await client.query(
+                'INSERT INTO clients (user_id, name, email) VALUES ($1, $2, $3) RETURNING id',
+                [userId, newClientName, recipientEmail]
+            );
+            finalClientId = newClientRes.rows[0].id;
         }
 
-        const msg = {
-            to: clientEmail,
-            from: 'dami@cytrustadvisory.ca', // This must be a verified sender in your SendGrid account.
-            subject: subject,
-            html: body
-        };
+        if (!finalClientId) {
+            throw new Error('Client could not be identified or created.');
+        }
 
+        // Send the email via SendGrid
+        const msg = {
+            to: recipientEmail,
+            from: 'dami@cytrustadvisory.ca', // Your verified sender
+            subject: subject,
+            html: body.replace(/\n/g, '<br>')
+        };
         await sgMail.send(msg);
 
-        await pool.query(
-            'INSERT INTO deal_notes (deal_id, user_id, note, type) VALUES ($1, $2, $3, $4) RETURNING *',
-            [null, userId, body, 'sent-email']
+        // Log the sent email in our new interactions table
+        await client.query(
+            'INSERT INTO client_interactions (user_id, client_id, type, content) VALUES ($1, $2, $3, $4)',
+            [userId, finalClientId, 'sent_email', `Subject: ${subject}\n\n${body}`]
         );
 
-        res.status(200).json({ message: 'Email sent successfully!' });
+        await client.query('COMMIT');
+        res.status(200).json({ message: 'Email sent and logged successfully!' });
+
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Error sending email:', err);
-        if (err.response) {
-            console.error(err.response.body);
-            return res.status(err.response.statusCode).json({ message: 'Failed to send email. Check SendGrid status.' });
-        }
-        res.status(500).json({ message: 'Server error while sending email.' });
+        res.status(500).json({ message: err.message || 'Server error while sending email.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -1302,15 +1322,20 @@ app.post('/api/ai/summarize', authenticateToken, async (req, res) => {
 
 // ➡️ NEW: POST endpoint for AI to draft a general-purpose email
 app.post('/api/ai/draft-email', authenticateToken, async (req, res) => {
-    const { prompt } = req.body;
-    const { name } = req.user; // Get the user's name from the token
+    const { prompt, clientName } = req.body; // Now accepts clientName
+    const { name: userName } = req.user;
+
 
     if (!prompt || prompt.trim().length === 0) {
         return res.status(400).json({ message: 'A prompt for the email is required.' });
     }
 
-    const fullPrompt = `An AI assistant is drafting an email for a user named "${name}". Based on the user's request, generate a professional and clear email body. Do not include a subject line or a signature block, only the body of the email. User's request: "${prompt}"`;
-    
+    const fullPrompt = `You are an AI assistant drafting an email for a user named "${userName}".
+        The email is for a client named "${clientName || '(Client Name)'}".
+        Based on the user's request, generate a professional and clear email body. 
+        Format the email with proper paragraphs and line breaks. 
+        Do NOT include a subject line. Conclude with a professional closing but do NOT sign the user's name.
+        User's request: "${prompt}"`;    
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",

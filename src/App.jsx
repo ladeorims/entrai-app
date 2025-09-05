@@ -217,15 +217,15 @@ const App = () => {
     const renderView = () => {
         if (!isLoggedIn || !token) {
             switch (publicPageView) {
-                case 'Features': return <FeaturesPage setActiveView={handlePublicPageView} />;
-                case 'Pricing': return <PricingPage setActiveView={handlePublicPageView} onSelectPlan={handleSelectPlan} />;
-                case 'HowItWorks': return <HowItWorksPage setActiveView={handlePublicPageView} />;
-                case 'About': return <AboutPage setActiveView={handlePublicPageView} />;
-                case 'Careers': return <CareersPage setActiveView={handlePublicPageView} />;
-                case 'Contact': return <ContactPage setActiveView={handlePublicPageView} />;
-                case 'Privacy': return <PrivacyPage setActiveView={handlePublicPageView} />;
-                case 'Terms': return <TermsPage setActiveView={handlePublicPageView} />;
-                case 'Security': return <SecurityPage setActiveView={handlePublicPageView} />;
+                case 'Features': return <FeaturesPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Pricing': return <PricingPage onSelectPlan={handleSelectPlan} onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'HowItWorks': return <HowItWorksPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'About': return <AboutPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Careers': return <CareersPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Contact': return <ContactPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Privacy': return <PrivacyPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Terms': return <TermsPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
+                case 'Security': return <SecurityPage onStartTrial={handleStartTrial} onLaunchApp={handleLaunchApp} setActiveView={handlePublicPageView} />;
                 case 'Auth': return <AuthPage onAuth={handleAuth} isLoading={isLoading} authMessage={authMessage} setAuthMessage={setAuthMessage} />;
                 default: return <LandingPage onLaunchApp={handleLaunchApp} onStartTrial={handleStartTrial} onSelectPlan={handleSelectPlan} />;
             }

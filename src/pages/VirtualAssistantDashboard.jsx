@@ -23,6 +23,7 @@ const VirtualAssistantDashboard = ({ token }) => {
     const [meetingState, setMeetingState] = useState({ title: '', date: '', startTime: '', endTime: '', description: '', generatedEmail: '', isLoading: false });
     const [isTrashModalVisible, setIsTrashModalVisible] = useState(false);
     const [trashedTasks, setTrashedTasks] = useState([]);
+    const [clients, setClients] = useState([]);
 
     const fetchTasks = useCallback(async () => {
         if (!token) { setIsLoading(false); return; }
@@ -39,10 +40,26 @@ const VirtualAssistantDashboard = ({ token }) => {
         }
     }, [token]);
 
+       const fetchClients = useCallback(async () => {
+        if (!token) return;
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/crm/clients`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (response.ok) {
+                // CORRECTED: The client list is now correctly saved to state
+                setClients(await response.json());
+            }
+        } catch (error) { console.error("Failed to fetch clients for VA:", error); }
+    }, [token]);
 
     useEffect(() => {
         fetchTasks();
     }, [fetchTasks]);
+
+    useEffect(() => {
+        if (isEmailModalVisible) {
+            fetchClients();
+        }
+    }, [isEmailModalVisible, fetchClients]);
 
     const handleAddTask = async (e) => {
         e.preventDefault();
@@ -132,16 +149,22 @@ const VirtualAssistantDashboard = ({ token }) => {
     const handleGenerateEmail = async () => {
         if (!emailState.prompt.trim()) return;
         setEmailState(prev => ({ ...prev, isLoading: true, generatedBody: '' }));
+        
+        let clientName = '';
+        if(emailState.selectedClientId) {
+            const client = clients.find(c => c.id === emailState.selectedClientId);
+            clientName = client?.name;
+        } else if (emailState.isNewClient) {
+            clientName = emailState.newClientName;
+        }
+
         try {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/draft-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ prompt: emailState.prompt })
+                body: JSON.stringify({ prompt: emailState.prompt, clientName })
             });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message);
-            }
+            if (!response.ok) { const err = await response.json(); throw new Error(err.message); }
             const result = await response.json();
             setEmailState(prev => ({ ...prev, generatedBody: result.emailBody, isLoading: false }));
         } catch (error) {
@@ -153,31 +176,29 @@ const VirtualAssistantDashboard = ({ token }) => {
     const handleSendEmail = async () => {
         setEmailState(prev => ({ ...prev, sendStatus: 'Sending...', isLoading: true }));
         try {
+            const body = {
+                recipientEmail: emailState.recipient,
+                subject: emailState.subject,
+                body: emailState.generatedBody,
+                clientId: emailState.selectedClientId,
+                newClientName: emailState.isNewClient ? emailState.newClientName : null,
+            };
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    clientEmail: emailState.recipient,
-                    subject: emailState.subject,
-                    body: emailState.generatedBody,
-                    clientId: 1 // Placeholder clientId as it's required but not essential for this action
-                })
+                body: JSON.stringify(body)
             });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message);
-            }
+            if (!response.ok) { const err = await response.json(); throw new Error(err.message); }
             setEmailState(prev => ({ ...prev, sendStatus: 'Email sent successfully!', isLoading: false }));
             setTimeout(() => {
                 setIsEmailModalVisible(false);
-                setEmailState({ recipient: '', subject: '', prompt: '', generatedBody: '', isLoading: false, sendStatus: '' });
+                setEmailState({ recipient: '', subject: '', prompt: '', generatedBody: '', isLoading: false, sendStatus: '', selectedClientId: null, isNewClient: false, newClientName: '' });
             }, 2000);
         } catch (error) {
             console.error("Error sending email:", error);
             setEmailState(prev => ({ ...prev, sendStatus: `Error: ${error.message}`, isLoading: false }));
         }
     };
-
     
     // ➡️ NEW: Function to generate and download an .ics calendar file
     const handleCreateMeetingFile = (e) => {
@@ -371,17 +392,28 @@ const VirtualAssistantDashboard = ({ token }) => {
                             <button onClick={() => setIsEmailModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/></button>
                         </div>
                         <div className="space-y-4">
-                            <div className='flex gap-4'>
-                                <input type="email" placeholder="Recipient's Email" value={emailState.recipient} onChange={(e) => setEmailState(p => ({...p, recipient: e.target.value}))} className={formSelectClasses}/>
-                                <input type="text" placeholder="Subject" value={emailState.subject} onChange={(e) => setEmailState(p => ({...p, subject: e.target.value}))} className={formSelectClasses}/>
+                            <div className="flex justify-center mb-4">
+                                <button onClick={() => setEmailState(p => ({...p, isNewClient: false}))} className={`px-4 py-2 text-sm font-semibold rounded-l-lg transition-all ${!emailState.isNewClient ? 'bg-gradient-to-r from-accent-start to-accent-end text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700'}`}><Users size={16} className="inline-block mr-2"/>Existing Client</button>
+                                <button onClick={() => setEmailState(p => ({...p, isNewClient: true, selectedClientId: null}))} className={`px-4 py-2 text-sm font-semibold rounded-r-lg transition-all ${emailState.isNewClient ? 'bg-gradient-to-r from-accent-start to-accent-end text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700'}`}><UserPlus size={16} className="inline-block mr-2"/>New Client</button>
                             </div>
-                            <textarea placeholder="Tell the AI what this email is about..." value={emailState.prompt} onChange={(e) => setEmailState(p => ({...p, prompt: e.target.value}))} rows="3" className={formTextareaClasses}/>
+
+                            {emailState.isNewClient ? (
+                                <div className='flex gap-4'>
+                                    <input type="text" placeholder="New Client Name" value={emailState.newClientName} onChange={(e) => setEmailState(p => ({...p, newClientName: e.target.value}))} className="form-input w-full"/>
+                                    <input type="email" placeholder="Recipient's Email" value={emailState.recipient} onChange={(e) => setEmailState(p => ({...p, recipient: e.target.value}))} className="form-input w-full"/>
+                                </div>
+                            ) : (
+                                <SearchableClientDropdown clients={clients} selectedClientId={emailState.selectedClientId} onSelect={(id) => { const client = clients.find(c=>c.id === id); setEmailState(p => ({...p, selectedClientId: id, recipient: client.email})) }} />
+                            )}
+                            
+                            <input type="text" placeholder="Subject" value={emailState.subject} onChange={(e) => setEmailState(p => ({...p, subject: e.target.value}))} className="form-input w-full"/>
+                            <textarea placeholder="Tell the AI what this email is about..." value={emailState.prompt} onChange={(e) => setEmailState(p => ({...p, prompt: e.target.value}))} rows="3" className="form-textarea w-full"/>
                             <button onClick={handleGenerateEmail} disabled={emailState.isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
                                 {emailState.isLoading ? <Loader2 className="animate-spin" /> : 'Generate Draft'}
                             </button>
                             {emailState.generatedBody && (
                                 <>
-                                    <textarea value={emailState.generatedBody} onChange={(e) => setEmailState(p => ({...p, generatedBody: e.target.value}))} rows="8" className={formTextareaClasses} />
+                                    <textarea value={emailState.generatedBody} onChange={(e) => setEmailState(p => ({...p, generatedBody: e.target.value}))} rows="8" className="form-textarea w-full" />
                                     <button onClick={handleSendEmail} disabled={emailState.isLoading} className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-500 transition-colors flex items-center justify-center disabled:opacity-50">
                                         {emailState.isLoading && emailState.sendStatus ? <Loader2 className="animate-spin" /> : 'Send Email'}
                                     </button>
