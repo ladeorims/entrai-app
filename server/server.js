@@ -25,7 +25,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// IMPORTANT: The Stripe webhook needs the raw request body, so we add it BEFORE express.json()
+// =========================================================================
+// STRIPE WEBHOOK LISTENER
+// This route must come BEFORE express.json() to receive the raw request body
+// =========================================================================
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -34,26 +37,39 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
-        console.log(`❌ Error message: ${err.message}`);
+        console.log(`❌ Webhook signature verification failed: ${err.message}`);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
+    // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const customerEmail = session.customer_details.email;
         
-        console.log(`🔔 Checkout session completed for ${customerEmail}`);
+        console.log(`🔔 Payment successful for checkout session. Customer email: ${customerEmail}`);
+        
+        // Retrieve subscription to get the plan details
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        const priceId = subscription.items.data[0].price.id;
+
+        let planType = 'free'; // Default
+        if (priceId === process.env.STRIPE_SOLO_PLAN_PRICE_ID) {
+            planType = 'solo';
+        } else if (priceId === process.env.STRIPE_TEAM_PLAN_PRICE_ID) {
+            planType = 'team';
+        }
 
         try {
             const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [customerEmail]);
             if (userRes.rows.length > 0) {
                 const userId = userRes.rows[0].id;
                 await pool.query(
-                    `UPDATE users SET subscription_status = 'active', trial_ends_at = NULL WHERE id = $1`,
-                    [userId]
+                    `UPDATE users SET subscription_status = 'active', plan_type = $1, trial_ends_at = NULL WHERE id = $2`,
+                    [planType, userId]
                 );
-                console.log(`✅ Subscription updated to 'active' for user ${userId}`);
+                console.log(`✅ Subscription for user ${userId} updated to '${planType}' and status to 'active'`);
+            } else {
+                 console.error(`Webhook Error: No user found with email ${customerEmail}`);
             }
         } catch (dbError) {
             console.error('Error updating user subscription in database:', dbError);
@@ -62,6 +78,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
 
     res.status(200).json({ received: true });
 });
+
+
 
 // Middleware Setup
 app.use(express.json({ limit: '5mb' }));
@@ -317,8 +335,6 @@ const checkSubscription = (allowedPlans) => {
 // =========================================================================
 app.post('/api/signup', async (req, res) => {
     const { email, password, name, company, phoneNumber, companyDescription } = req.body;
-    
-    // Basic validation
     if (!email || !password || !name) {
         return res.status(400).json({ message: 'Email, password, and name are required.' });
     }
@@ -327,39 +343,30 @@ app.post('/api/signup', async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Check if user already exists
         const existingUser = await client.query('SELECT * FROM users WHERE email = $1', [email]);
         if (existingUser.rows.length > 0) {
             return res.status(409).json({ message: 'An account with this email already exists.' });
         }
 
-        // 2. Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        // 3. Create the new user
         const newUserResult = await client.query(
             'INSERT INTO users (email, password, name, company, phone_number, company_description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
             [email, hashedPassword, name, company, phoneNumber, companyDescription]
         );
         const userId = newUserResult.rows[0].id;
 
-        // 4. Set trial period for the new user
         await client.query(
-            `UPDATE users SET 
-                subscription_status = 'trialing', 
-                trial_ends_at = NOW() + INTERVAL '14 days',
-                plan_type = 'solo' -- Assign them to a plan during trial
-             WHERE id = $1`,
+            `UPDATE users SET subscription_status = 'trialing', trial_ends_at = NOW() + INTERVAL '14 days', plan_type = 'solo' WHERE id = $1`,
             [userId]
         );
 
-        // 5. Send a verification email (This is a security best practice)
         const verificationToken = jwt.sign({ userId: userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+        // CORRECTED: The link now points to your live backend server
+        const verificationUrl = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
         const msg = {
             to: email,
-            from: 'dami@cytrustadvisory.ca', // This MUST be a verified sender in your SendGrid account
+            from: 'dami@cytrustadvisory.ca',
             subject: 'Welcome to Entrai! Please Verify Your Email',
             html: `
                 <div style="font-family: sans-serif; text-align: center; padding: 40px;">
@@ -375,7 +382,6 @@ app.post('/api/signup', async (req, res) => {
         await sgMail.send(msg);
 
         await client.query('COMMIT');
-        
         res.status(201).json({ message: 'Account created! Please check your email to verify your account and complete setup.' });
 
     } catch (err) {

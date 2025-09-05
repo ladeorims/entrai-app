@@ -1,65 +1,70 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useEffect, useState } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu, X, Check } from 'lucide-react';
 import AnimatedLogo from '../components/AnimatedLogo';
 
 const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan }) => {
-  // This hook handles smooth scrolling for anchor links and sets the footer year.
-  useEffect(() => {
-    // Smooth scroll for internal links
-    const handleSmoothScroll = (e) => {
-      const id = e.currentTarget.getAttribute('href');
-      if (id && id.startsWith('#') && id.length > 1) {
-        e.preventDefault();
-        document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    };
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const handleToggleTheme = () => setIsDarkMode(!isDarkMode);
 
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-      a.addEventListener('click', handleSmoothScroll);
-    });
+    useEffect(() => {
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', e => {
+                const id = a.getAttribute('href');
+                if (id && id.startsWith('#') && id.length > 1) {
+                    e.preventDefault();
+                    document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setIsMenuOpen(false);
+                }
+            })
+        });
+    }, []);
+    
+    const navLinks = (
+        <>
+            <a href="#features" className="block md:inline-block py-2 px-3 hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">Features</a>
+            <a href="#pricing" className="block md:inline-block py-2 px-3 hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">Pricing</a>
+            <a href="#how" className="block md:inline-block py-2 px-3 hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">How it works</a>
+            <a href="#faq" className="block md:inline-block py-2 px-3 hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">FAQ</a>
+        </>
+    );
 
-    // Set dynamic year in the footer
-    const yearEl = document.getElementById('yr');
-    if (yearEl) {
-      yearEl.textContent = new Date().getFullYear();
-    }
-
-    // Cleanup function to remove event listeners
-    return () => {
-      document.querySelectorAll('a[href^="#"]').forEach(a => {
-        a.removeEventListener('click', handleSmoothScroll);
-      });
-    };
-  }, []);
-
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  const handleToggleTheme = () => {
-        setIsDarkMode(!isDarkMode);
-    };
-
-  return (
-    <div className={isDarkMode ? 'dark' : ''}>
-      <div className="bg-primary-bg dark:bg-dark-primary-bg text-text-primary dark:text-dark-text-primary font-sans">
-            <header className="sticky top-0 bg-card-bg/80 dark:bg-dark-card-bg/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-50">
-                <div className="container mx-auto px-5 py-3.5 flex items-center justify-between max-w-7xl">
-                    <div className="flex items-center gap-2.5 font-extrabold tracking-wide">
-                        <AnimatedLogo />                        
-                    </div>
-          <nav className="hidden md:flex items-center gap-5 text-text-secondary dark:text-dark-text-secondary font-semibold">
-            <a href="#features" className="hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">Features</a>
-            <a href="#how" className="hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">How it works</a>
-            <a href="#pricing" className="hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-text-primary dark:hover:text-dark-text-primary transition-colors">FAQ</a>
-            <button onClick={handleToggleTheme} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+    return (
+        <div className={isDarkMode ? 'dark' : ''}>
+            <div className="bg-primary-bg dark:bg-dark-primary-bg text-text-primary dark:text-dark-text-primary font-sans">
+                <header className="sticky top-0 bg-card-bg/80 dark:bg-dark-card-bg/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-50">
+                    <div className="container mx-auto px-5 py-3.5 flex items-center justify-between max-w-7xl">
+                        <a href="#" onClick={(e) => { e.preventDefault(); window.location.reload(); }} className="flex items-center gap-2.5 font-extrabold tracking-wide text-xl">
+                           <AnimatedLogo />
+                        </a>
+                        <nav className="hidden md:flex items-center gap-5 text-text-secondary dark:text-dark-text-secondary font-semibold">
+                            {navLinks}
+                            {/* CORRECTED: The icon syntax is now fixed */}
+                            <button onClick={handleToggleTheme} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
                                 {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
-            </button>
-            <button onClick={onLaunchApp} className="ml-2 bg-transparent border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 text-text-secondary dark:text-dark-text-secondary font-semibold px-4 py-2 rounded-xl transition">Sign in</button>
-            <button onClick={onStartTrial} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold px-4 py-2 rounded-xl transition shadow-lg hover:opacity-90">Start Free</button>
-          </nav>
-        </div>
-      </header>
+                            </button>
+                            <button onClick={onLaunchApp} className="ml-2 bg-transparent border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 px-4 py-2 rounded-xl transition">Sign in</button>
+                            <button onClick={onStartTrial} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold px-4 py-2 rounded-xl transition shadow-lg hover:opacity-90">Start Free</button>
+                        </nav>
+                        <div className="md:hidden flex items-center">
+                            <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                            </button>
+                        </div>
+                    </div>
+                    {isMenuOpen && (
+                        <div className="md:hidden absolute top-full left-0 w-full bg-card-bg dark:bg-dark-card-bg shadow-lg">
+                            <nav className="flex flex-col items-center p-4 text-text-secondary dark:text-dark-text-secondary font-semibold">
+                                {navLinks}
+                                <div className="mt-4 flex gap-4 w-full">
+                                    <button onClick={onLaunchApp} className="w-full bg-transparent border border-slate-300 dark:border-slate-700 px-4 py-2 rounded-xl">Sign in</button>
+                                    <button onClick={onStartTrial} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white font-semibold px-4 py-2 rounded-xl">Start Free</button>
+                                </div>
+                            </nav>
+                        </div>
+                    )}
+                </header>
 
       <main className="container mx-auto px-5 max-w-7xl">
         {/* HERO */}
@@ -177,65 +182,54 @@ const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan }) => {
                     </section>
 
                     {/* PRICING */}
-                    <section id="pricing" className="py-14">
+                  <section id="pricing" className="py-14">
                         <h2 className="text-4xl lg:text-5xl font-bold text-center mb-3">Simple, fair pricing</h2>
                         <p className="text-text-secondary dark:text-dark-text-secondary text-lg text-center mb-12">Start for free, and scale as you grow. No hidden fees.</p>
                         <div className="grid lg:grid-cols-3 gap-6 items-stretch">
-                            {/* Starter Plan */}
                             <div className="p-[1px] bg-gradient-to-br from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl">
                                 <div className="bg-card-bg dark:bg-dark-card-bg rounded-[15px] h-full p-6 flex flex-col">
                                     <h3 className="text-2xl font-bold">Starter</h3>
-                                    {/* CHANGE: Applied gradient to price text */}
                                     <div className="text-5xl font-extrabold my-2 bg-gradient-to-r from-accent-start to-accent-end text-transparent bg-clip-text">$0<span className="text-lg font-medium text-text-secondary dark:text-dark-text-secondary"> / mo</span></div>
-                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">Perfect for testing.</p>
-                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6">
-                                      <li className="flex items-center"> All Core Features</li>
-
-                                <li className="flex items-center"> Unlimited AI Generations</li>
-
-                                <li className="flex items-center"> Advanced Analytics</li>
-
-                                <li className="flex items-center"> Priority Support</li>
+                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">For individuals getting started.</p>
+                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6 text-sm">
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Dashboard & Assistant</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>5 Invoices / month</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>10 Deals / month</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>20 AI Actions / month</li>
                                     </ul>
                                     <div className="flex-grow"></div>
-                                    {/* Starter Plan Button */}
-                                  <button onClick={onStartTrial} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">
-                                        Get Started Free
-                                  </button>                               
-                                   </div>
+                                    <button onClick={onStartTrial} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">Get Started Free</button>
+                                </div>
                             </div>
-                            {/* Solo Plan (Most Popular) */}
                             <div className="p-[1px] bg-gradient-to-br from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end rounded-2xl shadow-lg">
                                 <div className="bg-card-bg dark:bg-dark-card-bg rounded-[15px] h-full p-6 flex flex-col">
                                     <h3 className="text-2xl font-bold">Solo</h3>
-                                    <div className="text-5xl font-extrabold my-2 bg-gradient-to-r from-accent-start to-accent-end text-transparent bg-clip-text">$15.99<span className="text-lg font-medium text-text-secondary dark:text-dark-text-secondary"> / mo</span></div>
-                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">Everything you need.</p>
-                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6">
-                                      <li className="flex items-center"> Everything in Pro</li>
-
-                                <li className="flex items-center"> Dedicated Account Manager</li>
-
-                                <li className="flex items-center"> Custom Integrations</li>
-
-                                <li className="flex items-center"> Team Collaboration Tools</li>
+                                    <div className="text-5xl font-extrabold my-2">$15.99<span className="text-lg font-medium text-text-secondary dark:text-dark-text-secondary"> / mo</span></div>
+                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">For solopreneurs running their business.</p>
+                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6 text-sm">
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Everything in Starter</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Full Access to All Hubs</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Unlimited Invoices & Deals</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Native Automations</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>200 AI Actions / month</li>
                                     </ul>
                                     <div className="flex-grow"></div>
-                                    <button onClick={() => onSelectPlan('Solo')} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">
-                                      Choose Solo
-                                    </button>
+                                    <button onClick={() => onSelectPlan('Solo')} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">Choose Solo</button>
                                 </div>
                             </div>
-                            {/* Team Plan */}
                             <div className="p-[1px] bg-gradient-to-br from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl">
                                 <div className="bg-card-bg dark:bg-dark-card-bg rounded-[15px] h-full p-6 flex flex-col">
                                     <h3 className="text-2xl font-bold">Team</h3>
-                                    <div className="text-5xl font-extrabold my-2 bg-gradient-to-r from-accent-start to-accent-end text-transparent bg-clip-text">$25<span className="text-lg font-medium text-text-secondary dark:text-dark-text-secondary"> / mo</span></div>
-                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">For small teams.</p>
-                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6">...</ul>
+                                    <div className="text-5xl font-extrabold my-2">$25<span className="text-lg font-medium text-text-secondary dark:text-dark-text-secondary"> / user/mo</span></div>
+                                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">For small, collaborative teams.</p>
+                                    <ul className="space-y-2.5 text-text-secondary dark:text-dark-text-secondary mb-6 text-sm">
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Everything in Solo</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Up to 5 Team Members</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>Collaboration Features</li>
+                                        <li className="flex items-center gap-3"><Check size={16} className="text-green-500"/>600 AI Actions / month</li>
+                                    </ul>
                                     <div className="flex-grow"></div>
-                                    <button onClick={() => onSelectPlan('Team')} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">
-                                          Choose Team
-                                    </button>
+                                    <button onClick={() => onSelectPlan('Team')} className="w-full mt-4 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold py-3 rounded-lg transition hover:opacity-90">Choose Team</button>
                                 </div>
                             </div>
                         </div>

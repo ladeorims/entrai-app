@@ -19,6 +19,15 @@ import SettingsPage from './pages/SettingsPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CRMDashboard from './pages/CRMDashboard'; // NEW: Import the CRM dashboard
+import FeaturesPage from './pages/public/FeaturesPage';
+import PricingPage from './pages/public/PricingPage';
+import HowItWorksPage from './pages/public/HowItWorksPage';
+import AboutPage from './pages/public/AboutPage';
+import CareersPage from './pages/public/CareersPage';
+import ContactPage from './pages/public/ContactPage';
+import PrivacyPage from './pages/public/PrivacyPage';
+import TermsPage from './pages/public/TermsPage';
+import SecurityPage from './pages/public/SecurityPage';
 
 const App = () => {
     const [activeView, setActiveView] = useState('Landing');
@@ -36,6 +45,7 @@ const App = () => {
     const [isOnboardingVisible, setIsOnboardingVisible] = useState(false);
     const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
     const [isResetPasswordView, setIsResetPasswordView] = useState(false);
+    const [publicPageView, setPublicPageView] = useState('Landing'); // NEW: Controls which public page is visible
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -148,8 +158,8 @@ const App = () => {
         localStorage.setItem('theme', newTheme);
     };
 
-    const handleLaunchApp = () => setActiveView('Auth');
-    const handleStartTrial = () => setActiveView('Auth');
+    const handleLaunchApp = () => setPublicPageView('Auth');
+    const handleStartTrial = () => setPublicPageView('Auth');
 
     const handleSelectPlan = (plan) => {
         setSelectedPlan(plan);
@@ -198,10 +208,24 @@ const App = () => {
         return 'A';
     };
 
+    const handlePublicPageView = (page) => {
+        setPublicPageView(page);
+        window.scrollTo(0, 0); // Scroll to top on page change
+    };
+
     const renderView = () => {
         if (!isLoggedIn || !token) {
-            switch (activeView) {
-                case 'Auth': return <AuthPage onAuth={handleAuth} isLoading={isLoading} authMessage={authMessage} />;
+            switch (publicPageView) {
+                case 'Features': return <FeaturesPage setActiveView={handlePublicPageView} />;
+                case 'Pricing': return <PricingPage setActiveView={handlePublicPageView} onSelectPlan={handleSelectPlan} />;
+                case 'HowItWorks': return <HowItWorksPage setActiveView={handlePublicPageView} />;
+                case 'About': return <AboutPage setActiveView={handlePublicPageView} />;
+                case 'Careers': return <CareersPage setActiveView={handlePublicPageView} />;
+                case 'Contact': return <ContactPage setActiveView={handlePublicPageView} />;
+                case 'Privacy': return <PrivacyPage setActiveView={handlePublicPageView} />;
+                case 'Terms': return <TermsPage setActiveView={handlePublicPageView} />;
+                case 'Security': return <SecurityPage setActiveView={handlePublicPageView} />;
+                case 'Auth': return <AuthPage onAuth={handleAuth} isLoading={isLoading} authMessage={authMessage} setAuthMessage={setAuthMessage} />;
                 default: return <LandingPage onLaunchApp={handleLaunchApp} onStartTrial={handleStartTrial} onSelectPlan={handleSelectPlan} />;
             }
           } else {
