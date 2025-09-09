@@ -2079,13 +2079,15 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
         let recommendations;
         try {
             const aiResponseText = completion.choices[0].message.content.trim();
-            // Use a regex to find the JSON array within the response string, in case the AI adds extra text.
-            const jsonMatch = aiResponseText.match(/(\[.*\])/s);
-            if (jsonMatch && jsonMatch[0]) {
-                recommendations = JSON.parse(jsonMatch[0]);
+            // Find the start and end of the JSON array
+            const startIndex = aiResponseText.indexOf('[');
+            const endIndex = aiResponseText.lastIndexOf(']');
+            
+            if (startIndex > -1 && endIndex > -1) {
+                const jsonString = aiResponseText.substring(startIndex, endIndex + 1);
+                recommendations = JSON.parse(jsonString);
             } else {
-                // If regex fails, try to parse the whole string as a fallback.
-                recommendations = JSON.parse(aiResponseText);
+                throw new Error("No valid JSON array found in AI response.");
             }
         } catch (e) {
             console.error("Failed to parse AI recommendations, using fallback.", e);
