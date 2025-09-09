@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, PlusCircle, UserPlus, Square, CheckSquare, FileText, Bot, Megaphone, Info, Zap } from 'lucide-react';
 import Card from '../components/ui/Card';
 import AddTaskModal  from '../components/modals/AddTaskModal';
-import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
+import CreateInvoiceModal  from '../components/modals/CreateInvoiceModal';
 import { ClientDealModal } from '../components/modals/ClientDealModal';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 import { AskAIModal } from '../components/modals/AskAIModal';
