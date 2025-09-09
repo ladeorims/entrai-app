@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CheckSquare, Calendar, Mail, FileText, Trash2, XCircle, PlusCircle, Loader2, Wand2, AlertTriangle, RotateCcw, UserPlus, Users } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { AddTaskModal } from '../components/modals/AddTaskModal';
-import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
+import { SearchableClientDropdown } from '../components/ui/SearchableClientDropdown';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} form-select`;
