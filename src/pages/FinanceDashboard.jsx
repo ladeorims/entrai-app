@@ -3,8 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, ExternalLink, PlusCircle, Wand2, XCircle, Loader2, Trash2, FileText, Download, Send, Save, Edit, Check, AlertTriangle, CreditCard, Repeat } from 'lucide-react';
 import Card from '../components/ui/Card';
-import CreateInvoiceModal from '../components/modals/CreateInvoiceModal';
-import TransferModal from '../components/modals/TransferModal';
+import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
+import { TransferModal } from '../components/modals/TransferModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} form-select`;

@@ -3,8 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { PlusCircle, Edit, Trash2, XCircle, Save, Bot, Loader2, Wand2, Mail, Users, CheckCircle, FileText, ChevronLeft, ChevronRight, Sparkles, FileSignature } from 'lucide-react';
 import Card from "../components/ui/Card";
-import ClientDealModal from '../components/modals/ClientDealModal';
-import IntakeFormModal from '../components/modals/IntakeFormModal';
+import { ClientDealModal } from '../components/modals/ClientDealModal';
+import { IntakeFormModal } from '../components/modals/IntakeFormModal';
 
 const salesStages = ['New Leads', 'Contacted', 'Proposal Sent', 'Negotiation', 'Closed Won'];
 

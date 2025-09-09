@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Megaphone, PlusCircle, Wand2, XCircle, Loader2, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
-import NewCampaignModal from '../components/modals/NewCampaignModal';
+import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formSelectClasses = `${formInputClasses} form-select`;
