@@ -6,7 +6,6 @@
 //              now updated with AI integration and client management for sales-related functionalities.
 // =========================================================================
 
-// Import necessary libraries.
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -155,7 +154,6 @@ const generateInvoicePDF = async (invoiceId, userId) => {
 
     const finalY = doc.lastAutoTable.finalY || 150;
 
-    // Add Totals
     doc.setFontSize(12);
     doc.text(`Subtotal: $${(invoice.total_amount - invoice.tax_amount).toFixed(2)}`, 200, finalY + 15, { align: 'right' });
     doc.text(`Tax (${invoice.tax_rate}%): $${Number(invoice.tax_amount).toFixed(2)}`, 200, finalY + 22, { align: 'right' });
@@ -163,7 +161,6 @@ const generateInvoicePDF = async (invoiceId, userId) => {
     doc.setFont(undefined, 'bold');
     doc.text(`Total: $${Number(invoice.total_amount).toLocaleString()}`, 200, finalY + 30, { align: 'right' });
 
-    // Return the PDF document as a buffer
     return Buffer.from(doc.output('arraybuffer'));
 };
 
@@ -178,18 +175,13 @@ for (const key of requiredEnv) {
     }
 }
 
-// ➡️ UPDATED: Consolidated all table creation logic into one clean function
-// Replace the existing pg.Pool configuration in server.js with this
-
 const pool = new pg.Pool(
     process.env.DATABASE_URL ? {
-        // This configuration is used for production environments like Render
         connectionString: process.env.DATABASE_URL,
         ssl: {
             rejectUnauthorized: false
         }
     } : {
-        // This configuration is used for your local development environment
         user: process.env.DB_USER,
         host: process.env.DB_HOST,
         database: process.env.DB_NAME,
@@ -199,13 +191,11 @@ const pool = new pg.Pool(
 );
 
 const initializeDatabase = async () => {
-    // UPDATED: Added the created_at column to the main table definition
     const userTableQuery = `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, name VARCHAR(255), company VARCHAR(255), phone_number VARCHAR(20), address VARCHAR(255), city_province_postal VARCHAR(255), is_verified BOOLEAN DEFAULT FALSE, profile_picture_url TEXT, company_description TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    
     const clientsTableQuery = `CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, phone_number VARCHAR(20), company_name VARCHAR(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CONSTRAINT unique_client_email_per_user UNIQUE (user_id, email))`;
     const salesDealsTableQuery = `CREATE TABLE IF NOT EXISTS sales_deals (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, value NUMERIC(12, 2) NOT NULL, stage VARCHAR(50) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
     const dealNotesTableQuery = `CREATE TABLE IF NOT EXISTS deal_notes (id SERIAL PRIMARY KEY, deal_id INTEGER NOT NULL REFERENCES sales_deals(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, note TEXT NOT NULL, type VARCHAR(50), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const tasksTableQuery = `CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, status VARCHAR(50) DEFAULT 'incomplete', priority VARCHAR(50) DEFAULT 'Medium', due_date TIMESTAMPTZ, is_deleted BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
+    const tasksTableQuery = `CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, status VARCHAR(50) DEFAULT 'incomplete', priority VARCHAR(50) DEFAULT 'Medium', due_date TIMESTAMPTZ, is_deleted BOOLEAN DEFAULT FALSE, is_recurring BOOLEAN DEFAULT FALSE, recurrence_interval VARCHAR(50), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
     const transactionsTableQuery = `CREATE TABLE IF NOT EXISTS transactions (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, title VARCHAR(255) NOT NULL, amount NUMERIC(12, 2) NOT NULL, type VARCHAR(50) NOT NULL, category VARCHAR(100), transaction_date TIMESTAMPTZ NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
     const campaignsTableQuery = `CREATE TABLE IF NOT EXISTS campaigns (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, platform VARCHAR(100), ad_spend NUMERIC(12, 2) DEFAULT 0, reach INTEGER DEFAULT 0, engagement INTEGER DEFAULT 0, conversions INTEGER DEFAULT 0, start_date TIMESTAMPTZ, end_date TIMESTAMPTZ, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
     const contentCalendarTableQuery = `CREATE TABLE IF NOT EXISTS content_calendar (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, post_text TEXT, platform VARCHAR(100), status VARCHAR(50) DEFAULT 'draft', post_date TIMESTAMPTZ, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
@@ -225,7 +215,6 @@ const initializeDatabase = async () => {
         )
     `;
 
-    // UPDATED: Also added created_at here to ensure it gets added to existing tables
     const alterUsersTableQuery = `
         ALTER TABLE users
         ADD COLUMN IF NOT EXISTS company_logo_url TEXT,
@@ -243,6 +232,26 @@ const initializeDatabase = async () => {
     `;
     
     const alterInvoicesQuery = `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ;`;
+    const alterTasksQuery = `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS recurrence_interval VARCHAR(50);`;
+    const intakeFormsTableQuery = `CREATE TABLE IF NOT EXISTS intake_forms (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, questions JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id))`;
+    const formSubmissionsTableQuery = `CREATE TABLE IF NOT EXISTS form_submissions (id SERIAL PRIMARY KEY, form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE, responses JSONB NOT NULL, client_name VARCHAR(255), client_email VARCHAR(255), submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
+    const userGoalsTableQuery = `
+        CREATE TABLE IF NOT EXISTS user_goals (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            revenue_goal NUMERIC(12, 2) DEFAULT 0,
+            new_clients_goal INTEGER DEFAULT 0,
+            deals_won_goal INTEGER DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+
+    const alterTransactionsQuery = `
+        ALTER TABLE transactions
+        ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business';
+    `;
+    
 
     try {
         await pool.query(userTableQuery);
@@ -260,6 +269,11 @@ const initializeDatabase = async () => {
         await pool.query(clientInteractionsTableQuery);
         await pool.query(alterUsersTableQuery);
         await pool.query(alterInvoicesQuery);
+        await pool.query(alterTasksQuery);
+        await pool.query(intakeFormsTableQuery);
+        await pool.query(formSubmissionsTableQuery);
+        await pool.query(userGoalsTableQuery);
+        await pool.query(alterTransactionsQuery); 
 
         console.log('All tables created or already exist.');
         console.log('Schema updates successful.');
@@ -375,21 +389,25 @@ app.post('/api/signup', async (req, res) => {
         // CORRECTED: The link now points to your live backend server
         const verificationUrl = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
-        const msg = {
-            to: email,
-            from: 'dami@cytrustadvisory.ca',
-            subject: 'Welcome to Entrai! Please Verify Your Email',
-            html: `
-                <div style="font-family: sans-serif; text-align: center; padding: 40px;">
-                    <h2>Welcome to Entrai!</h2>
-                    <p>Thanks for signing up. Please click the button below to verify your email address and start your trial.</p>
-                    <a href="${verificationUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px;">
-                        Verify My Email
-                    </a>
-                    <p style="margin-top: 30px; font-size: 12px; color: #888;">If you did not sign up for this account, you can safely ignore this email.</p>
-                </div>
-            `,
-        };
+         const msg = {
+            to: email,
+            from: 'dami@cytrustadvisory.ca',
+            subject: 'Welcome to Entrai! Please Verify Your Email',
+            html: `
+<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
+    <h2 style="text-align: center;">Welcome to Entrai!</h2>
+    <p>Thanks for signing up. Please click the button below to verify your email address and start your trial.</p>
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="${verificationUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Verify My Email</a>
+    </div>
+    <p>If you did not sign up for this account, you can safely ignore this email.</p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
+    <div style="text-align: center; font-size: 12px; color: #6C757D;">
+        <p>&copy; ${new Date().getFullYear()} Entrai. All rights reserved.</p>
+        <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
+    </div>
+</div>`,
+        };
         await sgMail.send(msg);
 
         await client.query('COMMIT');
@@ -459,22 +477,25 @@ app.post('/api/forgot-password', async (req, res) => {
         const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
         
-        // CORRECTED: Email content is now for password reset
         const msg = {
-            to: email,
-            from: 'dami@cytrustadvisory.ca', // This MUST be a verified sender in your SendGrid account
-            subject: 'Password Reset Request for Your Entrai Account',
-            html: `
-                <div style="font-family: sans-serif; text-align: center; padding: 40px;">
-                    <h2>Password Reset Request</h2>
-                    <p>We received a request to reset the password for your account. Please click the button below to set a new password. This link is valid for one hour.</p>
-                    <a href="${resetUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px;">
-                        Reset Your Password
-                    </a>
-                    <p style="margin-top: 30px; font-size: 12px; color: #888;">If you did not request a password reset, you can safely ignore this email.</p>
-                </div>
-            `,
-        };
+            to: email,
+            from: 'dami@cytrustadvisory.ca',
+            subject: 'Password Reset Request for Your Entrai Account',
+            html: `
+<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
+    <h2 style="text-align: center;">Password Reset Request</h2>
+    <p>We received a request to reset the password for your account. Please click the button below to set a new password. This link is valid for one hour.</p>
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Reset Your Password</a>
+    </div>
+    <p>If you did not request a password reset, you can safely ignore this email.</p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
+    <div style="text-align: center; font-size: 12px; color: #6C757D;">
+        <p>&copy; ${new Date().getFullYear()} Entrai. All rights reserved.</p>
+        <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
+    </div>
+</div>`,
+        };
         await sgMail.send(msg);
 
         res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
@@ -620,6 +641,44 @@ app.put('/api/profile/onboarding', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error('Error saving onboarding data:', err);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+// GOALS API ROUTES (NEW)
+// =========================================================================
+
+app.get('/api/goals', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    try {
+        let goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
+        // If no goals exist for the user, create a default entry
+        if (goalsRes.rows.length === 0) {
+            await pool.query('INSERT INTO user_goals (user_id) VALUES ($1)', [userId]);
+            goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
+        }
+        res.status(200).json(goalsRes.rows[0]);
+    } catch (err) {
+        console.error('Error fetching goals:', err);
+        res.status(500).json({ message: 'Server error while fetching goals.' });
+    }
+});
+
+app.put('/api/goals', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    const { revenue_goal, new_clients_goal, deals_won_goal } = req.body;
+    try {
+        const updatedGoalsRes = await pool.query(
+            `UPDATE user_goals 
+             SET revenue_goal = $1, new_clients_goal = $2, deals_won_goal = $3, updated_at = NOW() 
+             WHERE user_id = $4 
+             RETURNING *`,
+            [revenue_goal, new_clients_goal, deals_won_goal, userId]
+        );
+        res.status(200).json(updatedGoalsRes.rows[0]);
+    } catch (err) {
+        console.error('Error updating goals:', err);
+        res.status(500).json({ message: 'Server error while updating goals.' });
     }
 });
 
@@ -831,7 +890,43 @@ app.get('/api/sales/clients/:clientId', authenticateToken, async (req, res) => {
     }
 });
 
-// Add to server/server.js in the SALES & CLIENTS section
+// Get or Create an Intake Form
+app.get('/api/sales/intake-form', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    try {
+        let form = await pool.query('SELECT * FROM intake_forms WHERE user_id = $1', [userId]);
+        if (form.rows.length === 0) {
+            // Create a default form if one doesn't exist
+            const defaultQuestions = [{ text: 'What are your primary goals for this project?' }];
+            const newForm = await pool.query(
+                'INSERT INTO intake_forms (user_id, questions) VALUES ($1, $2) RETURNING *',
+                [userId, JSON.stringify(defaultQuestions)]
+            );
+            return res.status(200).json(newForm.rows[0]);
+        }
+        res.status(200).json(form.rows[0]);
+    } catch (err) {
+        console.error('Error fetching intake form:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update an Intake Form
+app.put('/api/sales/intake-form', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    const { questions } = req.body;
+    try {
+        const updatedForm = await pool.query(
+            'UPDATE intake_forms SET questions = $1 WHERE user_id = $2 RETURNING *',
+            [JSON.stringify(questions), userId]
+        );
+        res.status(200).json(updatedForm.rows[0]);
+    } catch (err) {
+        console.error('Error updating intake form:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 
 // NEW: Endpoint specifically for the CRM to get a list of all clients
 app.get('/api/crm/clients', authenticateToken, async (req, res) => {
@@ -1052,14 +1147,6 @@ app.post('/api/sales/deals', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT (update) an existing deal
-// Replace the entire PUT /api/sales/deals/:dealId route in server.js
-
-// Replace in server/server.js
-
-// Replace the entire PUT /api/sales/deals/:dealId route in server.js
-
-// Replace in server/server.js
 
 app.put('/api/sales/deals/:dealId', authenticateToken, async (req, res) => {
     const { dealId } = req.params;
@@ -1296,28 +1383,27 @@ app.post('/api/sales/send-email', authenticateToken, async (req, res) => {
     }
 });
 
-// ➡️ NEW: POST endpoint for AI to summarize text
-app.post('/api/ai/summarize', authenticateToken, async (req, res) => {
-    const { text } = req.body;
+app.post('/api/ai/clean-text', authenticateToken, async (req, res) => {
+    const { text } = req.body;
 
-    if (!text || text.trim().length === 0) {
-        return res.status(400).json({ message: 'Text to summarize is required.' });
-    }
+    if (!text || text.trim().length === 0) {
+        return res.status(400).json({ message: 'Text to clean is required.' });
+    }
 
-    const prompt = `Please summarize the following document concisely and effectively, extracting the key points:\n\n---\n\n${text}`;
-    
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: prompt }],
-        });
+    const prompt = `You are a text formatting assistant. Clean up the following text by fixing line breaks, removing extra spaces, and ensuring proper paragraph structure. If you detect a list-like structure, format it with bullet points. Do not add any commentary, just return the cleaned text. User's text:\n\n---\n\n${text}`;
+    
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: prompt }],
+        });
 
-        const summary = completion.choices[0].message.content.trim();
-        res.status(200).json({ summary });
-    } catch (err) {
-        console.error('Error generating summary:', err);
-        res.status(500).json({ message: 'Error generating summary. Please ensure your OpenAI API key is valid.' });
-    }
+        const cleanedText = completion.choices[0].message.content.trim();
+        res.status(200).json({ cleanedText });
+    } catch (err) {
+        console.error('Error cleaning text:', err);
+        res.status(500).json({ message: 'Error cleaning text. Please ensure your OpenAI API key is valid.' });
+    }
 });
 
 // ➡️ NEW: POST endpoint for AI to draft a general-purpose email
@@ -1353,56 +1439,68 @@ app.post('/api/ai/draft-email', authenticateToken, async (req, res) => {
 // ➡️ NEW: VIRTUAL ASSISTANT (TASKS) API ROUTES
 // =========================================================================
 
-// GET all non-deleted tasks for the logged-in user
-app.get('/api/tasks', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const tasks = await pool.query(
-            'SELECT * FROM tasks WHERE user_id = $1 AND is_deleted = FALSE ORDER BY status ASC, due_date ASC NULLS LAST, created_at DESC', 
-            [userId]
-        );
-        res.status(200).json(tasks.rows);
-    } catch (err) {
-        console.error('Error fetching tasks:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// POST a new task for the logged-in user
 app.post('/api/tasks', authenticateToken, async (req, res) => {
-    const { title, priority, dueDate } = req.body;
-    const { userId } = req.user;
-    try {
-        const newTask = await pool.query(
-            'INSERT INTO tasks (user_id, title, priority, due_date) VALUES ($1, $2, $3, $4) RETURNING *',
-            [userId, title, priority, dueDate]
-        );
-        res.status(201).json(newTask.rows[0]);
-    } catch (err) {
-        console.error('Error adding new task:', err);
-        res.status(500).json({ message: 'Server error' });
+    const { title, priority, dueDate, is_recurring, recurrence_interval } = req.body;
+    const { userId } = req.user;
+    try {
+        const newTask = await pool.query(
+            'INSERT INTO tasks (user_id, title, priority, due_date, is_recurring, recurrence_interval) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [userId, title, priority, dueDate, is_recurring, recurrence_interval]
+        );
+        res.status(201).json(newTask.rows[0]);
+    } catch (err) {
+        console.error('Error adding new task:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/api/tasks/:taskId', authenticateToken, async (req, res) => {
+    const { taskId } = req.params;
+    const { title, priority, dueDate, status, is_recurring, recurrence_interval } = req.body;
+    const { userId } = req.user;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const updatedTaskRes = await client.query(
+            'UPDATE tasks SET title = $1, priority = $2, due_date = $3, status = $4, is_recurring = $5, recurrence_interval = $6 WHERE id = $7 AND user_id = $8 AND is_deleted = FALSE RETURNING *',
+            [title, priority, dueDate, status, is_recurring, recurrence_interval, taskId, userId]
+        );
+
+        if (updatedTaskRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Task not found or user not authorized.' });
+        }
+
+        const updatedTask = updatedTaskRes.rows[0];
+
+        // If a recurring task is marked as complete, generate the next one
+        if (updatedTask.status === 'complete' && updatedTask.is_recurring && updatedTask.recurrence_interval) {
+            let nextDueDate = new Date(updatedTask.due_date || Date.now());
+            if (updatedTask.recurrence_interval === 'Daily') {
+                nextDueDate.setDate(nextDueDate.getDate() + 1);
+            } else if (updatedTask.recurrence_interval === 'Weekly') {
+                nextDueDate.setDate(nextDueDate.getDate() + 7);
+            } else if (updatedTask.recurrence_interval === 'Monthly') {
+                nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+            }
+
+            await client.query(
+                'INSERT INTO tasks (user_id, title, priority, due_date, is_recurring, recurrence_interval) VALUES ($1, $2, $3, $4, $5, $6)',
+                [userId, title, priority, nextDueDate.toISOString(), true, updatedTask.recurrence_interval]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.status(200).json(updatedTask);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error updating task:', err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 });
 
-// PUT (update) an existing task
-app.put('/api/tasks/:taskId', authenticateToken, async (req, res) => {
-    const { taskId } = req.params;
-    const { title, priority, dueDate, status } = req.body;
-    const { userId } = req.user;
-    try {
-        const updatedTask = await pool.query(
-            'UPDATE tasks SET title = $1, priority = $2, due_date = $3, status = $4 WHERE id = $5 AND user_id = $6 AND is_deleted = FALSE RETURNING *',
-            [title, priority, dueDate, status, taskId, userId]
-        );
-        if (updatedTask.rows.length === 0) {
-            return res.status(404).json({ message: 'Task not found or user not authorized.' });
-        }
-        res.status(200).json(updatedTask.rows[0]);
-    } catch (err) {
-        console.error('Error updating task:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
 
 // ➡️ UPDATED: DELETE a task (soft delete) by setting is_deleted to true
 app.delete('/api/tasks/:taskId', authenticateToken, async (req, res) => {
@@ -1512,42 +1610,69 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
 
 // POST a new transaction
 app.post('/api/transactions', authenticateToken, async (req, res) => {
-    const { title, amount, type, category, transaction_date } = req.body;
+    const { title, amount, type, category, transaction_date, scope } = req.body;
     const { userId } = req.user;
     try {
         const newTransaction = await pool.query(
-            'INSERT INTO transactions (user_id, title, amount, type, category, transaction_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [userId, title, amount, type, category, transaction_date]
+            'INSERT INTO transactions (user_id, title, amount, type, category, transaction_date, scope) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [userId, title, amount, type, category, transaction_date, scope]
+        );
+        res.status(201).json(newTransaction.rows[0]);
+    } catch (err) {
+        console.error('Error adding transaction:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/transactions/transfer', authenticateToken, async (req, res) => {
+    const { amount, date, description } = req.body;
+    const { userId } = req.user;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        // Business Expense
+        await client.query(
+            `INSERT INTO transactions (user_id, title, amount, type, category, transaction_date, scope) 
+             VALUES ($1, $2, $3, 'expense', 'Personal Transfer', $4, 'business')`,
+            [userId, `Transfer to Personal: ${description}`, amount, date]
         );
-        res.status(201).json(newTransaction.rows[0]);
+        // Personal Income
+        await client.query(
+            `INSERT INTO transactions (user_id, title, amount, type, category, transaction_date, scope) 
+             VALUES ($1, $2, $3, 'income', 'Business Transfer', $4, 'personal')`,
+            [userId, `Transfer from Business: ${description}`, amount, date]
+        );
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Transfer logged successfully.' });
     } catch (err) {
-        console.error('Error adding transaction:', err);
-        res.status(500).json({ message: 'Server error' });
+        await client.query('ROLLBACK');
+        console.error('Error logging transfer:', err);
+        res.status(500).json({ message: 'Server error while logging transfer.' });
+    } finally {
+        client.release();
     }
 });
 
-// GET a summary of financial data
-// In server.js, replace the entire app.get('/api/finance/summary', ...) block
 
+// GET a summary of financial data
 app.get('/api/finance/summary', authenticateToken, async (req, res) => {
     const { userId } = req.user;
-    const { period = 'monthly' } = req.query;
+    const { period = 'monthly', scope = 'business' } = req.query;
 
-    // ➡️ UPDATED: Added 'intervalUnit' to ensure correct pluralization for SQL
     let dateTrunc, interval, dateFormat, timePeriod, intervalUnit;
     switch (period) {
-        case 'daily': 
-            dateTrunc = 'day'; 
+        case 'daily':
+            dateTrunc = 'day';
             interval = '1 day';
             timePeriod = 30;
-            intervalUnit = 'days'; // Plural
+            intervalUnit = 'days';
             dateFormat = (date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             break;
-        case 'weekly': 
+        case 'weekly':
             dateTrunc = 'week';
             interval = '1 week';
             timePeriod = 12;
-            intervalUnit = 'weeks'; // Plural
+            intervalUnit = 'weeks';
             dateFormat = (dateStr) => {
                 const startOfWeek = new Date(dateStr);
                 const endOfWeek = new Date(startOfWeek);
@@ -1555,38 +1680,37 @@ app.get('/api/finance/summary', authenticateToken, async (req, res) => {
                 return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { day: 'numeric' })}`;
             };
             break;
-        case 'quarterly': 
+        case 'quarterly':
             dateTrunc = 'quarter';
             interval = '3 months';
             timePeriod = 4;
-            intervalUnit = 'quarters'; // Plural
+            intervalUnit = 'quarters';
             dateFormat = (date) => `Q${Math.floor((new Date(date).getMonth() + 3) / 3)} ${new Date(date).getFullYear()}`;
             break;
-        case 'yearly': 
+        case 'yearly':
             dateTrunc = 'year';
             interval = '1 year';
             timePeriod = 5;
-            intervalUnit = 'years'; // Plural
+            intervalUnit = 'years';
             dateFormat = (date) => new Date(date).getFullYear();
             break;
-        default: 
+        default:
             dateTrunc = 'month';
             interval = '1 month';
             timePeriod = 12;
-            intervalUnit = 'months'; // Plural
+            intervalUnit = 'months';
             dateFormat = (date) => new Date(date).toLocaleString('default', { month: 'short', year: 'numeric' });
     }
 
     try {
-        const metricsQuery = await pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses FROM transactions WHERE user_id = $1`, [userId]);
+        const metricsQuery = await pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses FROM transactions WHERE user_id = $1 AND scope = $2`, [userId, scope]);
         const { total_income, total_expenses } = metricsQuery.rows[0];
         const net_profit = total_income - total_expenses;
         const burn_rate = total_expenses > total_income ? (total_expenses - total_income) / 12 : 0;
         const runway = burn_rate > 0 ? total_income / burn_rate : Infinity;
 
-        const recentTransactionsQuery = await pool.query('SELECT * FROM transactions WHERE user_id = $1 ORDER BY transaction_date DESC LIMIT 5', [userId]);
-
-        // ➡️ UPDATED: The INTERVAL now uses the corrected plural 'intervalUnit'
+        const recentTransactionsQuery = await pool.query('SELECT * FROM transactions WHERE user_id = $1 AND scope = $2 ORDER BY transaction_date DESC LIMIT 5', [userId, scope]);
+        
         const chartQuery = await pool.query(
             `WITH date_series AS (
                 SELECT generate_series(
@@ -1601,7 +1725,7 @@ app.get('/api/finance/summary', authenticateToken, async (req, res) => {
                     SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income, 
                     SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses 
                 FROM transactions 
-                WHERE user_id = $1 
+                WHERE user_id = $1 AND scope = $2
                 GROUP BY period_start
             )
             SELECT 
@@ -1611,7 +1735,7 @@ app.get('/api/finance/summary', authenticateToken, async (req, res) => {
             FROM date_series ds
             LEFT JOIN transaction_data td ON ds.period_start = td.period_start
             ORDER BY ds.period_start ASC`,
-            [userId]
+            [userId, scope]
         );
 
         res.status(200).json({
@@ -1781,53 +1905,67 @@ app.post('/api/ai/generate-post-idea', authenticateToken, async (req, res) => {
 // ➡️ NEW: MAIN DASHBOARD API ROUTE
 // =========================================================================
 app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        // CHANGE: Placed pool.query calls directly inside Promise.all to resolve linting warnings.
-        const [salesResult, tasksResult, financeMTDResult, financeWeeklyResult] = await Promise.all([
-            pool.query(`SELECT COUNT(*) as open_deals, COALESCE(SUM(value), 0) as pipeline_value FROM sales_deals WHERE user_id = $1 AND stage != 'Closed Won' AND stage != 'Closed Lost'`, [userId]),
-            pool.query(`SELECT COUNT(*) as upcoming_tasks FROM tasks WHERE user_id = $1 AND status = 'incomplete' AND due_date >= NOW() AND is_deleted = FALSE`, [userId]),
-            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) as net_profit_mtd FROM transactions WHERE user_id = $1 AND transaction_date >= DATE_TRUNC('month', NOW())`, [userId]),
-            pool.query(`
-                SELECT 
-                    COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as weekly_revenue,
-                    COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as weekly_expenses
-                FROM transactions 
-                WHERE user_id = $1 AND transaction_date >= DATE_TRUNC('week', NOW())
-            `, [userId])
-        ]);
+    const { userId } = req.user;
+    try {
+        const [salesResult, tasksResult, financeMTDResult, financeWeeklyResult, clientsResult, dealsWonResult] = await Promise.all([
+            pool.query(`SELECT COUNT(*) as open_deals, COALESCE(SUM(value), 0) as pipeline_value FROM sales_deals WHERE user_id = $1 AND stage != 'Closed Won' AND stage != 'Closed Lost'`, [userId]),
+            pool.query(`SELECT COUNT(*) as upcoming_tasks FROM tasks WHERE user_id = $1 AND status = 'incomplete' AND due_date >= NOW() AND is_deleted = FALSE`, [userId]),
+            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as monthly_revenue FROM transactions WHERE user_id = $1 AND scope = 'business' AND transaction_date >= DATE_TRUNC('month', NOW())`, [userId]),
+            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as weekly_revenue, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as weekly_expenses FROM transactions WHERE user_id = $1 AND scope = 'business' AND transaction_date >= DATE_TRUNC('week', NOW())`, [userId]),
+            pool.query(`SELECT COUNT(*) as new_clients_this_month FROM clients WHERE user_id = $1 AND created_at >= DATE_TRUNC('month', NOW())`, [userId]),
+            pool.query(`SELECT COUNT(*) as deals_won_this_month FROM sales_deals WHERE user_id = $1 AND stage = 'Closed Won' AND updated_at >= DATE_TRUNC('month', NOW())`, [userId])
+        ]);
 
-        const pipelineValue = parseFloat(salesResult.rows[0].pipeline_value);
-        const netProfitMTD = parseFloat(financeMTDResult.rows[0].net_profit_mtd);
-        const weeklyRevenue = parseFloat(financeWeeklyResult.rows[0].weekly_revenue);
-        const weeklyExpenses = parseFloat(financeWeeklyResult.rows[0].weekly_expenses);
-        const weeklyCashFlow = weeklyRevenue - weeklyExpenses;
+        const pipelineValue = parseFloat(salesResult.rows[0].pipeline_value);
+        const monthlyRevenue = parseFloat(financeMTDResult.rows[0].monthly_revenue);
+        const weeklyRevenue = parseFloat(financeWeeklyResult.rows[0].weekly_revenue);
+        const weeklyExpenses = parseFloat(financeWeeklyResult.rows[0].weekly_expenses);
+        const weeklyCashFlow = weeklyRevenue - weeklyExpenses;
 
-        // Business Health Score Calculation
-        const profitScore = Math.min(Math.max(netProfitMTD / 5000, 0), 1) * 50;
-        const pipelineScore = Math.min(Math.max(pipelineValue / 10000, 0), 1) * 30;
-        const taskScore = Math.max(1 - (parseInt(tasksResult.rows[0].upcoming_tasks) / 10), 0) * 20;
-        const healthScore = Math.round(profitScore + pipelineScore + taskScore);
+        const profitScore = Math.min(Math.max(monthlyRevenue / 5000, 0), 1) * 50;
+        const pipelineScore = Math.min(Math.max(pipelineValue / 10000, 0), 1) * 30;
+        const taskScore = Math.max(1 - (parseInt(tasksResult.rows[0].upcoming_tasks) / 10), 0) * 20;
+        const healthScore = Math.round(profitScore + pipelineScore + taskScore);
 
-        res.status(200).json({
-            openDeals: salesResult.rows[0].open_deals || 0,
-            pipelineValue: pipelineValue.toFixed(2),
-            upcomingTasks: tasksResult.rows[0].upcoming_tasks || 0,
-            netProfitMTD: netProfitMTD.toFixed(2),
-            healthScore: healthScore,
-            weeklyRevenue: weeklyRevenue.toFixed(2),
-            weeklyExpenses: weeklyExpenses.toFixed(2),
-            weeklyCashFlow: weeklyCashFlow.toFixed(2),
-            recommendations: [
-                { id: 1, text: "You could save ~$150/mo by consolidating software subscriptions.", icon: "💡" },
-                { id: 2, text: "Enable automatic invoice reminders to get paid 3 days faster on average.", icon: "🔔" },
-                { id: 3, text: "Your sales pipeline is strong. Consider creating a new marketing campaign to add more leads.", icon: "🚀" }
-            ]
+        //  AI-powered recommendations
+        const userRes = await pool.query('SELECT company_description FROM users WHERE id = $1', [userId]);
+        const recommendationPrompt = `
+            As an AI business assistant for a solo entrepreneur whose business is: "${userRes.rows[0].company_description}", 
+            analyze the following snapshot of their business and provide 3 short, actionable recommendations.
+            - Current month's revenue: $${monthlyRevenue.toFixed(2)}
+            - Open sales pipeline value: $${pipelineValue.toFixed(2)}
+            - Number of urgent tasks: ${tasksResult.rows[0].upcoming_tasks}
+            - This week's cash flow: $${weeklyCashFlow.toFixed(2)}
+            Format each recommendation as an object in a JSON array like this: [{"icon": "💡", "text": "Your recommendation here."}]
+        `;
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: recommendationPrompt }],
         });
-    } catch (err) {
-        console.error('Error fetching dashboard overview:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+        const recommendations = JSON.parse(completion.choices[0].message.content.trim());
+
+        res.status(200).json({
+            metrics: {
+                monthlyRevenue: monthlyRevenue.toFixed(2),
+                newClientsThisMonth: clientsResult.rows[0].new_clients_this_month || 0,
+                dealsWonThisMonth: dealsWonResult.rows[0].deals_won_this_month || 0,
+            },
+            healthScore: healthScore,
+            weeklyRevenue: weeklyRevenue.toFixed(2),
+            weeklyExpenses: weeklyExpenses.toFixed(2),
+            weeklyCashFlow: weeklyCashFlow.toFixed(2),
+            recommendations: recommendations
+        });
+    } catch (err) {
+        console.error('Error fetching dashboard overview:', err);
+        
+        const fallbackRecs = [
+            { id: 1, text: "Review your sales pipeline to identify key opportunities.", icon: "💡" },
+            { id: 2, text: "Check for any overdue invoices to improve cash flow.", icon: "🔔" },
+            { id: 3, text: "Consider a new marketing campaign to generate more leads.", icon: "🚀" }
+        ];
+        res.status(500).json({ message: 'Server error', recommendations: fallbackRecs });
+    }
 });
 
 app.get('/api/dashboard/recent-activity', authenticateToken, async (req, res) => {
@@ -1879,6 +2017,37 @@ app.post('/api/ai/status-message', authenticateToken, async (req, res) => {
     }
 });
 
+app.post('/api/ai/ask', authenticateToken, async (req, res) => {
+    const { prompt } = req.body;
+    const { userId } = req.user;
+
+    if (!prompt) {
+        return res.status(400).json({ message: 'A prompt is required.' });
+    }
+
+    try {
+        // Fetch user context for a smarter response
+        const userRes = await pool.query('SELECT name, company, company_description FROM users WHERE id = $1', [userId]);
+        const userContext = userRes.rows[0];
+
+        const fullPrompt = `You are "Entrai AI", an expert business assistant for a solo entrepreneur.
+        The user's name is ${userContext.name} and their business is: "${userContext.company_description}".
+        Based on this context, provide a helpful, clear, and concise response to the following user request. Do not be overly verbose.
+        
+        User Request: "${prompt}"`;
+        
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: fullPrompt }],
+        });
+
+        const response = completion.choices[0].message.content.trim();
+        res.status(200).json({ response });
+    } catch (err) {
+        console.error('Error with Ask AI endpoint:', err);
+        res.status(500).json({ message: 'Error generating AI response.' });
+    }
+});
 
 // ➡️ NEW: INVOICING API ROUTES
 // =========================================================================
@@ -2278,6 +2447,64 @@ app.get('/api/alerts/overdue-invoices', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/public/intake-form/:formId', async (req, res) => {
+    const { formId } = req.params;
+    try {
+        const form = await pool.query('SELECT id, user_id, questions FROM intake_forms WHERE id = $1', [formId]);
+        if (form.rows.length === 0) {
+            return res.status(404).json({ message: 'Form not found.' });
+        }
+        res.status(200).json(form.rows[0]);
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Public endpoint to handle form submission
+app.post('/api/public/intake-form/:formId/submit', async (req, res) => {
+    const { formId } = req.params;
+    const { responses, client_name, client_email } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const formRes = await client.query('SELECT user_id FROM intake_forms WHERE id = $1', [formId]);
+        if (formRes.rows.length === 0) {
+            // No need to rollback here as no transaction has occurred yet
+            client.release();
+            return res.status(404).json({ message: 'Form not found.' });
+        }
+        const { user_id } = formRes.rows[0];
+
+        // Create a new client from the submission, or do nothing if they already exist.
+        // REMOVED: The unused 'newClient' variable and the 'RETURNING id' clause.
+        await client.query(
+            'INSERT INTO clients (user_id, name, email) VALUES ($1, $2, $3) ON CONFLICT (user_id, email) DO NOTHING',
+            [user_id, client_name, client_email]
+        );
+        
+        // Log the submission
+        await client.query(
+            'INSERT INTO form_submissions (form_id, responses, client_name, client_email) VALUES ($1, $2, $3, $4)',
+            [formId, JSON.stringify(responses), client_name, client_email]
+        );
+
+        // Create a notification task for the business owner
+        await client.query(
+            'INSERT INTO tasks (user_id, title, priority) VALUES ($1, $2, $3)',
+            [user_id, `New intake form submitted by ${client_name}`, 'High']
+        );
+
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Form submitted successfully!' });
+    } catch (err) { // CORRECTED: Now using the 'err' variable in the log.
+        await client.query('ROLLBACK');
+        console.error('Error submitting intake form:', err);
+        res.status(500).json({ message: 'Server error during submission.' });
+    } finally {
+        client.release();
+    }
+});
 
 // =========================================================================
 // CREATE CHECKOUT SESSION FOR SUBSCRIPTIONS

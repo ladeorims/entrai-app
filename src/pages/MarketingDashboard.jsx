@@ -1,9 +1,11 @@
+/* eslint-disable no-irregular-whitespace */
 // src/pages/MarketingDashboard.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Megaphone, PlusCircle, Wand2, XCircle, Loader2, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
+import NewCampaignModal from '../components/modals/NewCampaignModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formSelectClasses = `${formInputClasses} form-select`;
@@ -14,7 +16,7 @@ const MarketingDashboard = ({ token }) => {
     const [content, setContent] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCampaignModalVisible, setIsCampaignModalVisible] = useState(false);
-    const [newCampaign, setNewCampaign] = useState({ name: '', platform: 'Facebook', ad_spend: '', reach: '', engagement: '', conversions: '', start_date: new Date().toISOString().split('T')[0] });
+    // const [newCampaign, setNewCampaign] = useState({ name: '', platform: 'Facebook', ad_spend: '', reach: '', engagement: '', conversions: '', start_date: new Date().toISOString().split('T')[0] });
     const [isContentModalVisible, setIsContentModalVisible] = useState(false);
     const [newContent, setNewContent] = useState({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0] });
     const [isAiModalVisible, setIsAiModalVisible] = useState(false);
@@ -41,23 +43,15 @@ const MarketingDashboard = ({ token }) => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const handleAddCampaign = async (e) => {
-        e.preventDefault();
-        try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/campaigns`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newCampaign) });
-            setIsCampaignModalVisible(false);
-            fetchData();
-        } catch (error) { console.error("Failed to add campaign:", error); }
-    };
-
     const handleAddContent = async (e) => {
-        e.preventDefault();
-        try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
-            setIsContentModalVisible(false);
-            fetchData();
-        } catch (error) { console.error("Failed to add content:", error); }
-    };
+        e.preventDefault();
+        try {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
+            setIsContentModalVisible(false);
+            setNewContent({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0] });
+            fetchData();
+        } catch (error) { console.error("Failed to add content:", error); }
+    };
 
     const handleGenerateIdea = async () => {
         if (!aiState.topic) return;
@@ -81,29 +75,7 @@ const MarketingDashboard = ({ token }) => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {isCampaignModalVisible && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <Card className="max-w-lg w-full">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold">New Campaign</h2>
-                            <button onClick={() => setIsCampaignModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/></button>
-                        </div>
-                        <form onSubmit={handleAddCampaign} className="space-y-4">
-                          <input type="text" placeholder="Campaign Name" onChange={e => setNewCampaign({...newCampaign, name: e.target.value})} className={formInputClasses} required/>
-                            <select onChange={e => setNewCampaign({...newCampaign, platform: e.target.value})} className={formSelectClasses}>
-                                <option>Facebook</option><option>Instagram</option><option>Google Ads</option><option>LinkedIn</option><option>Other</option>
-                            </select>
-                            <div className="grid grid-cols-2 gap-4">
-                                <input type="number" placeholder="Ad Spend ($)" onChange={e => setNewCampaign({...newCampaign, ad_spend: e.target.value})} className={formSelectClasses}/>
-                                <input type="number" placeholder="Reach" onChange={e => setNewCampaign({...newCampaign, reach: e.target.value})} className={formSelectClasses}/>
-                                <input type="number" placeholder="Engagement" onChange={e => setNewCampaign({...newCampaign, engagement: e.target.value})} className={formSelectClasses}/>
-                                <input type="number" placeholder="Conversions" onChange={e => setNewCampaign({...newCampaign, conversions: e.target.value})} className={formSelectClasses}/>
-                            </div>
-                            <button type="submit" className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold hover:opacity-90">Save Campaign</button>
-                        </form>
-                    </Card>
-                </div>
-            )}
+            {isCampaignModalVisible && <NewCampaignModal token={token} onClose={() => setIsCampaignModalVisible(false)} onCampaignAdded={fetchData} />}
 
             {isContentModalVisible && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -157,19 +129,20 @@ const MarketingDashboard = ({ token }) => {
             )}
 
             <header className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold">Marketing Suite</h1>
-                    <p className="text-text-secondary dark:text-dark-text-secondary mt-1">Manage campaigns, content, and analytics.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setIsAiModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center gap-2">
-                        <Wand2 size={16} /> AI Post Idea
-                    </button>
-                    <button onClick={() => setIsCampaignModalVisible(true)} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
-                        <PlusCircle size={16} /> New Campaign
-                    </button>
-                </div>
-            </header>
+                <div>
+                    <h1 className="text-3xl font-bold">Marketing Suite</h1>
+                    <p className="text-text-secondary dark:text-dark-text-secondary mt-1">Manage campaigns, content, and analytics.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => setIsAiModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center gap-2">
+                        <Wand2 size={16} /> AI Post Idea
+                    </button>
+                    <button onClick={() => setIsCampaignModalVisible(true)} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
+                        <PlusCircle size={16} /> New Campaign
+                    </button>
+                </div>
+            </header>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card><p className="text-text-secondary dark:text-dark-text-secondary text-sm mb-2">Total Reach</p><p className="text-3xl font-bold">{Number(summary.metrics.total_reach).toLocaleString()}</p></Card>

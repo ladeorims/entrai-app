@@ -104,7 +104,7 @@ const ProfilePage = ({ user, setUser, token, setActiveView, onSelectPlan }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card className="md:col-span-1">
                     <div className="flex flex-col items-center mb-6">
-                        {formData.profilePictureUrl ? (<img src={formData.profilePictureUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover mb-4" />) : (<div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end flex items-center justify-center text-white font-bold text-4xl mb-4">{initials}</div>)}
+                        {formData.profilePictureUrl ? (<img src={formData.profilePictureUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover mb-4" />) : (<div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent-start to-accent-end dark:from-dark-accent-start flex items-center justify-center text-white font-bold text-4xl mb-4">{initials}</div>)}
                         <input type="file" ref={fileInputRef} onChange={(e) => handlePictureUpload(e, 'profilePictureUrl')} className="hidden" accept="image/*" />
                         {isEditing && (<button onClick={() => fileInputRef.current.click()} className="text-sm font-semibold text-accent-start dark:text-dark-accent-mid hover:opacity-80">Upload new picture</button>)}
                     </div>

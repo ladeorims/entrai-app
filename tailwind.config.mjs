@@ -10,6 +10,10 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        logo: ['Poppins', 'sans-serif'], // NEW: Add the Poppins font for the logo
+      },
       // CHANGE: Replaced the entire color palette with the new design system
       colors: {
         // Light Theme
