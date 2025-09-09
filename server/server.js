@@ -1571,6 +1571,20 @@ app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) =>
 
 // ➡️ NEW: VIRTUAL ASSISTANT (TASKS) API ROUTES
 // =========================================================================
+// GET all non-deleted tasks for the logged-in user
+app.get('/api/tasks', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    try {
+        const tasks = await pool.query(
+            'SELECT * FROM tasks WHERE user_id = $1 AND is_deleted = FALSE ORDER BY status ASC, due_date ASC NULLS LAST, created_at DESC', 
+            [userId]
+        );
+        res.status(200).json(tasks.rows);
+    } catch (err) {
+        console.error('Error fetching tasks:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 app.post('/api/tasks', authenticateToken, async (req, res) => {
     const { title, priority, dueDate, is_recurring, recurrence_interval } = req.body;
