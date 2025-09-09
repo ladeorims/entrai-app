@@ -1,18 +1,17 @@
 /* eslint-disable no-irregular-whitespace */
-// src/pages/Dashboard.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, PlusCircle, Square, CheckSquare, Lightbulb, FileText, Send, Bot, DollarSign, Megaphone, Info } from 'lucide-react';
+import { Loader2, PlusCircle, UserPlus, Square, CheckSquare, FileText, Bot, Megaphone, Info, Zap } from 'lucide-react';
 import Card from '../components/ui/Card';
 import AddTaskModal from '../components/modals/AddTaskModal';
-import CreateInvoiceModal from '../components/modals/CreateInvoiceModal';
-import ClientDealModal from '../components/modals/ClientDealModal';
-import AskAIModal from '../components/modals/AskAIModal';
+// UPDATED: Changed the import to a named import by adding curly braces
+import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
+import { ClientDealModal } from '../components/modals/ClientDealModal';
+import { NewCampaignModal } from '../components/modals/NewCampaignModal';
+import { AskAIModal } from '../components/modals/AskAIModal';
 import GoalsWidget from '../components/dashboard/GoalsWidget';
 
-
 const BusinessHealthGauge = ({ score }) => {
-    const getStatus = (s) => {
+    const getStatus = (s) => {
         if (s >= 75) return { label: "You're on track", color: "text-green-500" };
         if (s >= 50) return { label: "Things are steady", color: "text-yellow-500" };
         return { label: "Needs attention", color: "text-red-500" };
@@ -37,7 +36,6 @@ const BusinessHealthGauge = ({ score }) => {
                         style={{ strokeDashoffset: 125.6 - (score / 100 * 125.6) }}
                     />
                 </svg>
-                {/* UPDATED: The needle element has been removed from here */}
             </div>
             <div className="text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start gap-2">
@@ -51,7 +49,7 @@ const BusinessHealthGauge = ({ score }) => {
     );
 };
 
-const Dashboard = ({ setActiveView, token, user }) => {
+const Dashboard = ({ token, user }) => {
     const [dashboardData, setDashboardData] = useState(null);
     const [tasks, setTasks] = useState([]);
     const [activity, setActivity] = useState([]);
@@ -63,17 +61,8 @@ const Dashboard = ({ setActiveView, token, user }) => {
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
     const [isClientDealModalOpen, setIsClientDealModalOpen] = useState(false);
+    const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
     const [isAskAIModalOpen, setIsAskAIModalOpen] = useState(false);
-
-    useEffect(() => {
-        const hour = new Date().getHours();
-        const name = user?.name?.split(' ')[0] || 'there';
-        if (hour < 12) setGreeting(`Good morning, ${name}`);
-        else if (hour < 18) setGreeting(`Good afternoon, ${name}`);
-        else setGreeting(`Good evening, ${name}`);
-    }, [user]);
-
-    // Inside src/pages/Dashboard.jsx
 
     const fetchData = useCallback(async () => {
         if (!token) { setIsLoading(false); return; }
@@ -115,10 +104,15 @@ const Dashboard = ({ setActiveView, token, user }) => {
             setIsLoading(false);
         }
     }, [token]);
-
+    
     useEffect(() => {
+        const hour = new Date().getHours();
+        const name = user?.name?.split(' ')[0] || 'there';
+        if (hour < 12) setGreeting(`Good morning, ${name}`);
+        else if (hour < 18) setGreeting(`Good afternoon, ${name}`);
+        else setGreeting(`Good evening, ${name}`);
         fetchData();
-    }, [fetchData]);
+    }, [fetchData, user]);
 
     const toggleTask = async (taskToToggle) => {
         const updatedTasks = tasks.filter(t => t.id !== taskToToggle.id);
@@ -138,16 +132,16 @@ const Dashboard = ({ setActiveView, token, user }) => {
 
     const filteredActivity = activity.filter(item => activityFilter === 'ALL' || item.type.toUpperCase() === activityFilter);
 
-    if (isLoading) { return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent-start" size={32} /></div>; }
-    if (!dashboardData) { return <div className="text-center text-text-secondary">Could not load dashboard data. Please try again later.</div>; }
+    if (isLoading || !dashboardData) { return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent-start" size={32} /></div>; }
 
     return (
         <div className="animate-fade-in space-y-8">
             {isAddTaskModalOpen && <AddTaskModal token={token} onClose={() => setIsAddTaskModalOpen(false)} onTaskAdded={fetchData} />}
             {isCreateInvoiceModalOpen && <CreateInvoiceModal token={token} user={user} clients={clients} onClose={() => setIsCreateInvoiceModalOpen(false)} onInvoiceCreated={fetchData} />}
             {isClientDealModalOpen && <ClientDealModal token={token} clients={clients} onClose={() => setIsClientDealModalOpen(false)} onSuccess={fetchData} defaultToNewClient={true} />}
+            {isNewCampaignModalOpen && <NewCampaignModal token={token} onClose={() => setIsNewCampaignModalOpen(false)} onCampaignAdded={fetchData} />}
             {isAskAIModalOpen && <AskAIModal token={token} onClose={() => setIsAskAIModalOpen(false)} />}
-
+            
             <header>
                 <h1 className="text-3xl font-bold">{greeting}</h1>
                 <p className="text-text-secondary dark:text-dark-text-secondary mt-1">{statusMessage}</p>
@@ -156,11 +150,10 @@ const Dashboard = ({ setActiveView, token, user }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-2 space-y-8">
                     <GoalsWidget token={token} dashboardData={dashboardData} />
-                    <Card>
+                    <Card>
                         <h2 className="text-xl font-bold mb-4">Business Health</h2>
                         <BusinessHealthGauge score={dashboardData.healthScore} />
                     </Card>
-
                     <Card>
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold">Urgent Tasks</h2>
@@ -192,7 +185,7 @@ const Dashboard = ({ setActiveView, token, user }) => {
                                 <thead>
                                     <tr className="border-b border-slate-200 dark:border-slate-700">
                                         <th className="text-left font-semibold p-2">Description</th>
-                                        <th className="text-left font-semibold p-2">Type</th>
+                                        <th className="text-left font-semibold p-2">Type</th>
                                         <th className="text-left font-semibold p-2">Status</th>
                                         <th className="text-right font-semibold p-2">Amount</th>
                                     </tr>
@@ -201,13 +194,12 @@ const Dashboard = ({ setActiveView, token, user }) => {
                                     {filteredActivity.length > 0 ? filteredActivity.slice(0, 5).map((item, index) => (
                                         <tr key={index} className="border-b border-slate-200 dark:border-slate-800">
                                             <td className="p-2 truncate">{item.description}</td>
-                                            
                                             <td className="p-2"><span className="px-2 py-1 text-xs rounded-full bg-slate-200 dark:bg-slate-700 capitalize">{item.type.toLowerCase()}</span></td>
                                             <td className="p-2"><span className="capitalize text-text-secondary dark:text-dark-text-secondary">{item.status}</span></td>
                                             <td className="p-2 text-right font-semibold">{item.amount ? `$${Number(item.amount).toLocaleString()}` : '—'}</td>
                                         </tr>
                                     )) : <tr><td colSpan="4" className="text-center text-text-secondary dark:text-dark-text-secondary py-8">No recent activity.</td></tr>}
-                                </tbody>
+                              _</tbody>
                             </table>
                         </div>
                     </Card>
@@ -216,7 +208,7 @@ const Dashboard = ({ setActiveView, token, user }) => {
                 <div className="lg:col-span-1 space-y-8">
                     <Card>
                         <h2 className="text-xl font-bold mb-4">This Week</h2>
-                        <div className="space-y-4">
+                        <div className="space-y-4">
                             <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg"><p className="text-sm text-text-secondary dark:text-dark-text-secondary">Revenue</p><p className="text-2xl font-bold text-green-500">${Number(dashboardData.weeklyRevenue).toLocaleString()}</p></div>
                             <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg"><p className="text-sm text-text-secondary dark:text-dark-text-secondary">Expenses</p><p className="text-2xl font-bold text-red-500">${Number(dashboardData.weeklyExpenses).toLocaleString()}</p></div>
                             <div className="p-4 bg-slate-100 dark:bg-dark-primary-bg rounded-lg"><p className="text-sm text-text-secondary dark:text-dark-text-secondary">Cash Flow</p><p className={`text-2xl font-bold ${dashboardData.weeklyCashFlow >= 0 ? 'text-green-500' : 'text-red-500'}`}>{dashboardData.weeklyCashFlow >= 0 ? '+' : ''}${Number(dashboardData.weeklyCashFlow).toLocaleString()}</p></div>
@@ -226,24 +218,22 @@ const Dashboard = ({ setActiveView, token, user }) => {
                         <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
                         <div className="grid grid-cols-2 gap-4 text-center">
                             <button onClick={() => setIsCreateInvoiceModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><FileText className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">Create Invoice</span></button>
-                            <button onClick={() => setIsClientDealModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><UserPlus className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">Add New Client</span></button>
-                            <button onClick={() => setIsAskAIModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><Bot className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">Ask AI</span></button>
-                            <button onClick={() => setActiveView('Marketing')} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><Megaphone className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">New Campaign</span></button>
+                            <button onClick={() => setIsClientDealModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><UserPlus className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">Add New Client</span></button>
+                            <button onClick={() => setIsAskAIModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><Bot className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">Ask AI</span></button>
+                            <button onClick={() => setIsNewCampaignModalOpen(true)} className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-primary-bg transition-colors"><Megaphone className="text-accent-start dark:text-dark-accent-mid" /><span className="text-sm font-semibold">New Campaign</span></button>
                         </div>
                     </Card>
                     <Card>
-                        <h2 className="text-xl font-bold mb-4">Recommendations</h2>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Zap size={18} /> AI Recommendations</h2>
                         <div className="space-y-4">
-                            {dashboardData.recommendations.map(rec => (
-                                <div key={rec.id} className="flex items-start gap-3">
-                                    <div className="text-2xl">{rec.icon}</div>
+                            {dashboardData.recommendations.map((rec, index) => (
+                                <div key={index} className="flex items-start gap-3">
+                                    <div className="text-xl pt-0.5">{rec.icon}</div>
                                     <p className="text-text-secondary dark:text-dark-text-secondary text-sm">{rec.text}</p>
                                 </div>
                             ))}
                         </div>
-                        <p className="text-xs text-center text-text-secondary/70 dark:text-dark-text-secondary/70 mt-4">
-                            (AI-powered suggestions coming soon)
-                        </p>
+                        <p className="text-xs text-center text-text-secondary/70 dark:text-dark-text-secondary/70 mt-4">AI suggestions tailored to your business.</p>
                     </Card>
                 </div>
             </div>
@@ -252,3 +242,4 @@ const Dashboard = ({ setActiveView, token, user }) => {
 };
 
 export default Dashboard;
+
