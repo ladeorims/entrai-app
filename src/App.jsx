@@ -30,7 +30,7 @@ import ContactPage from './pages/public/ContactPage';
 import PrivacyPage from './pages/public/PrivacyPage';
 import TermsPage from './pages/public/TermsPage';
 import SecurityPage from './pages/public/SecurityPage';
-import IntakeFormPage from './pages/public/IntakeFormPage';
+import { IntakeFormPage } from './pages/public/IntakeFormPage';
 
 const App = () => {
     const [activeView, setActiveView] = useState('Landing');
