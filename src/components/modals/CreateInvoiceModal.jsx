@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { XCircle, Loader2, Download, Send, Save } from 'lucide-react';
 import Card from '../ui/Card';
-import SearchableClientDropdown from '../ui/SearchableClientDropdown';
+import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formTextareaClasses = `${formInputClasses} h-24`;
