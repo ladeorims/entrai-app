@@ -228,6 +228,7 @@ const initializeDatabase = async () => {
         ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user',
         ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE, 
         ALTER COLUMN profile_picture_url TYPE TEXT;
     `;
     
@@ -354,6 +355,27 @@ const checkSubscription = (allowedPlans) => {
     };
 };
 
+// =========================================================================
+// SETTINGS API ROUTE (NEW)
+// =========================================================================
+app.put('/api/settings', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    const { weeklyPulseEnabled } = req.body;
+
+    try {
+        const result = await pool.query(
+            'UPDATE users SET weekly_pulse_enabled = $1 WHERE id = $2 RETURNING id, weekly_pulse_enabled AS "weeklyPulseEnabled"',
+            [weeklyPulseEnabled, userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating settings:', err);
+        res.status(500).json({ message: 'Server error while updating settings.' });
+    }
+});
 
 // =========================================================================
 // AUTHENTICATION ROUTES
@@ -1267,6 +1289,42 @@ app.post('/api/sales/deals/:dealId/notes', authenticateToken, async (req, res) =
 });
 
 // =========================================================================
+// ANALYTICS API ROUTES (NEW)
+// =========================================================================
+app.get('/api/analytics/client-profitability', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT 
+                c.id, 
+                c.name,
+                COUNT(sd.id) AS deals_won,
+                COALESCE(SUM(sd.value), 0) AS total_value
+            FROM clients c
+            LEFT JOIN sales_deals sd ON c.id = sd.client_id AND sd.stage = 'Closed Won'
+            WHERE c.user_id = $1
+            GROUP BY c.id
+            HAVING COALESCE(SUM(sd.value), 0) > 0
+            ORDER BY total_value DESC;
+        `;
+        const result = await pool.query(query, [userId]);
+        
+        const profitabilityData = result.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            dealsWon: parseInt(row.deals_won, 10),
+            totalValue: parseFloat(row.total_value)
+        }));
+
+        res.status(200).json({ profitabilityData });
+    } catch (err) {
+        console.error('Error fetching client profitability data:', err);
+        res.status(500).json({ message: 'Server error while fetching analytics data.' });
+    }
+});
+
+
+// =========================================================================
 // AI INTEGRATION ROUTES
 // =========================================================================
 
@@ -1433,6 +1491,81 @@ app.post('/api/ai/draft-email', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error('Error drafting email:', err);
         res.status(500).json({ message: 'Error drafting email. Please ensure your OpenAI API key is valid.' });
+    }
+});
+
+app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+
+    try {
+        // 1. Fetch user info
+        const userRes = await pool.query('SELECT name, email, company_description FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found.' });
+        const user = userRes.rows[0];
+
+        // 2. Fetch data from the last 7 days
+        const [revenueRes, tasksRes, dealsRes] = await Promise.all([
+            pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = $1 AND type = 'income' AND transaction_date >= NOW() - INTERVAL '7 days'`, [userId]),
+            pool.query(`SELECT COUNT(*) as total FROM tasks WHERE user_id = $1 AND status = 'complete' AND updated_at >= NOW() - INTERVAL '7 days'`, [userId]),
+            pool.query(`SELECT COUNT(*) as total, COALESCE(SUM(value), 0) as value FROM sales_deals WHERE user_id = $1 AND stage = 'Closed Won' AND updated_at >= NOW() - INTERVAL '7 days'`, [userId])
+        ]);
+
+        const weeklySummary = `
+            - Revenue Earned: $${Number(revenueRes.rows[0].total).toLocaleString()}
+            - Deals Won: ${dealsRes.rows[0].total} (Total Value: $${Number(dealsRes.rows[0].value).toLocaleString()})
+            - Tasks Completed: ${tasksRes.rows[0].total}
+        `;
+
+        // 3. Fetch upcoming priorities
+        const [urgentTasksRes, hotDealsRes] = await Promise.all([
+            pool.query(`SELECT title FROM tasks WHERE user_id = $1 AND status = 'incomplete' AND due_date <= NOW() + INTERVAL '7 days' ORDER BY due_date ASC LIMIT 3`, [userId]),
+            pool.query(`SELECT name FROM sales_deals WHERE user_id = $1 AND stage = 'Negotiation' ORDER BY value DESC LIMIT 2`, [userId])
+        ]);
+
+        const upcomingPriorities = `
+            - Urgent Tasks: ${urgentTasksRes.rows.map(r => r.title).join(', ') || 'None'}
+            - Hot Deals to Close: ${hotDealsRes.rows.map(r => r.name).join(', ') || 'None'}
+        `;
+
+        // 4. Generate AI analysis
+        const prompt = `
+            You are "Entrai AI", an expert business assistant. Your tone is encouraging and professional.
+            Generate a concise weekly summary email for a user named ${user.name}.
+            
+            Last Week's Performance:
+            ${weeklySummary}
+
+            Upcoming Week's Priorities:
+            ${upcomingPriorities}
+
+            Based on this, write a short, motivating email. Start with "Here's your Weekly Pulse". 
+            Include a "Last Week's Wins" section and a "Top Priorities for This Week" section. 
+            Conclude with a single, insightful tip based on their activity (e.g., if revenue is high but tasks are low, suggest focusing on delivery).
+            Keep it brief and easy to scan. Do not include a sign-off.
+        `;
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: prompt }],
+        });
+
+        const emailBody = completion.choices[0].message.content.trim().replace(/\n/g, '<br/>');
+
+        // 5. Send the email
+        const msg = {
+            to: user.email,
+            from: 'dami@cytrustadvisory.ca', // Must be a verified sender
+            subject: `🚀 Your Weekly Pulse from Entrai`,
+            html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto;">${emailBody}</div>`
+        };
+
+        await sgMail.send(msg);
+
+        res.status(200).json({ message: 'Weekly Pulse email sent successfully.' });
+
+    } catch (err) {
+        console.error('Error generating Weekly Pulse:', err);
+        res.status(500).json({ message: 'Server error while generating report.' });
     }
 });
 
@@ -1907,7 +2040,7 @@ app.post('/api/ai/generate-post-idea', authenticateToken, async (req, res) => {
 app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
     const { userId } = req.user;
     try {
-        const [salesResult, tasksResult, financeMTDResult, financeWeeklyResult, clientsResult, dealsWonResult] = await Promise.all([
+        const [salesResult, tasksResult, financeMTDResult, financeWeeklyResult, clientsResult, dealsWonResult] = await Promise.all([
             pool.query(`SELECT COUNT(*) as open_deals, COALESCE(SUM(value), 0) as pipeline_value FROM sales_deals WHERE user_id = $1 AND stage != 'Closed Won' AND stage != 'Closed Lost'`, [userId]),
             pool.query(`SELECT COUNT(*) as upcoming_tasks FROM tasks WHERE user_id = $1 AND status = 'incomplete' AND due_date >= NOW() AND is_deleted = FALSE`, [userId]),
             pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as monthly_revenue FROM transactions WHERE user_id = $1 AND scope = 'business' AND transaction_date >= DATE_TRUNC('month', NOW())`, [userId]),
@@ -1927,7 +2060,6 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
         const taskScore = Math.max(1 - (parseInt(tasksResult.rows[0].upcoming_tasks) / 10), 0) * 20;
         const healthScore = Math.round(profitScore + pipelineScore + taskScore);
 
-        //  AI-powered recommendations
         const userRes = await pool.query('SELECT company_description FROM users WHERE id = $1', [userId]);
         const recommendationPrompt = `
             As an AI business assistant for a solo entrepreneur whose business is: "${userRes.rows[0].company_description}", 
@@ -1936,13 +2068,33 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
             - Open sales pipeline value: $${pipelineValue.toFixed(2)}
             - Number of urgent tasks: ${tasksResult.rows[0].upcoming_tasks}
             - This week's cash flow: $${weeklyCashFlow.toFixed(2)}
-            Format each recommendation as an object in a JSON array like this: [{"icon": "💡", "text": "Your recommendation here."}]
+            Format your entire response ONLY as a valid JSON array of objects, where each object has an "icon" and "text" key. Example: [{"icon": "💡", "text": "Your recommendation here."}]
         `;
         const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: [{ role: "user", content: recommendationPrompt }],
         });
-        const recommendations = JSON.parse(completion.choices[0].message.content.trim());
+
+        // UPDATED: Added robust parsing to prevent server crashes
+        let recommendations;
+        try {
+            const aiResponseText = completion.choices[0].message.content.trim();
+            // Use a regex to find the JSON array within the response string, in case the AI adds extra text.
+            const jsonMatch = aiResponseText.match(/(\[.*\])/s);
+            if (jsonMatch && jsonMatch[0]) {
+                recommendations = JSON.parse(jsonMatch[0]);
+            } else {
+                // If regex fails, try to parse the whole string as a fallback.
+                recommendations = JSON.parse(aiResponseText);
+            }
+        } catch (e) {
+            console.error("Failed to parse AI recommendations, using fallback.", e);
+            recommendations = [
+                { icon: "💡", text: "Review your sales pipeline to identify key opportunities." },
+                { icon: "🔔", text: "Check for any overdue invoices to improve cash flow." },
+                { icon: "🚀", text: "Consider a new marketing campaign to generate more leads." }
+            ];
+        }
 
         res.status(200).json({
             metrics: {
@@ -1958,7 +2110,6 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
         });
     } catch (err) {
         console.error('Error fetching dashboard overview:', err);
-        
         const fallbackRecs = [
             { id: 1, text: "Review your sales pipeline to identify key opportunities.", icon: "💡" },
             { id: 2, text: "Check for any overdue invoices to improve cash flow.", icon: "🔔" },
