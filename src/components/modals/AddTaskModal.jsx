@@ -5,7 +5,7 @@ import Card from '../ui/Card';
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} text-left`;
 
-const AddTaskModal = ({ token, onClose, onTaskAdded }) => {
+export const AddTaskModal = ({ token, onClose, onTaskAdded }) => {
     const [newTask, setNewTask] = useState({ title: '', priority: 'Medium', dueDate: '', is_recurring: false, recurrence_interval: 'Weekly' });
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -85,4 +85,4 @@ const AddTaskModal = ({ token, onClose, onTaskAdded }) => {
     );
 };
 
-export default AddTaskModal;
+// export default AddTaskModal;

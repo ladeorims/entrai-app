@@ -4,7 +4,7 @@ import Card from '../ui/Card';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 
-const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
+export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
     const [form, setForm] = useState(initialForm || { questions: [{ text: 'What are your primary goals for this project?' }] });
     const [isLoading, setIsLoading] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
@@ -90,4 +90,4 @@ const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
     );
 };
 
-export default IntakeFormModal;
+// export default IntakeFormModal;
