@@ -3,11 +3,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, PlusCircle, UserPlus, Square, CheckSquare, FileText, Bot, Megaphone, Info, Zap } from 'lucide-react';
 import Card from '../components/ui/Card';
 import AddTaskModal from '../components/modals/AddTaskModal';
-// UPDATED: Changed the import to a named import by adding curly braces
-import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
-import { ClientDealModal } from '../components/modals/ClientDealModal';
-import { NewCampaignModal } from '../components/modals/NewCampaignModal';
-import { AskAIModal } from '../components/modals/AskAIModal';
+// UPDATED: Removed curly braces from modal imports to use default exports
+import CreateInvoiceModal from '../components/modals/CreateInvoiceModal';
+import ClientDealModal from '../components/modals/ClientDealModal';
+import NewCampaignModal from '../components/modals/NewCampaignModal';
+import AskAIModal from '../components/modals/AskAIModal';
 import GoalsWidget from '../components/dashboard/GoalsWidget';
 
 const BusinessHealthGauge = ({ score }) => {
@@ -199,7 +199,7 @@ const Dashboard = ({ token, user }) => {
                                             <td className="p-2 text-right font-semibold">{item.amount ? `$${Number(item.amount).toLocaleString()}` : '—'}</td>
                                         </tr>
                                     )) : <tr><td colSpan="4" className="text-center text-text-secondary dark:text-dark-text-secondary py-8">No recent activity.</td></tr>}
-                              _</tbody>
+                              </tbody>
                             </table>
                         </div>
                     </Card>
