@@ -7,7 +7,7 @@ import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
 import { ClientDealModal } from '../components/modals/ClientDealModal';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 import { AskAIModal } from '../components/modals/AskAIModal';
-import GoalsWidget from '../components/dashboard/GoalsWidget';
+import { GoalsWidget } from '../components/dashboard/GoalsWidget';
 
 const BusinessHealthGauge = ({ score }) => {
     const getStatus = (s) => {
