@@ -2061,8 +2061,11 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
         const healthScore = Math.round(profitScore + pipelineScore + taskScore);
 
         const userRes = await pool.query('SELECT company_description FROM users WHERE id = $1', [userId]);
+        // CORRECTED: Add a safety check for the company description
+        const companyDescription = userRes.rows[0]?.company_description || "a small business"; 
+
         const recommendationPrompt = `
-            As an AI business assistant for a solo entrepreneur whose business is: "${userRes.rows[0].company_description}", 
+            As an AI business assistant for a solo entrepreneur whose business is: "${companyDescription}", 
             analyze the following snapshot of their business and provide 3 short, actionable recommendations.
             - Current month's revenue: $${monthlyRevenue.toFixed(2)}
             - Open sales pipeline value: $${pipelineValue.toFixed(2)}
@@ -2075,11 +2078,9 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
             messages: [{ role: "user", content: recommendationPrompt }],
         });
 
-        // UPDATED: Added robust parsing to prevent server crashes
         let recommendations;
         try {
             const aiResponseText = completion.choices[0].message.content.trim();
-            // Find the start and end of the JSON array
             const startIndex = aiResponseText.indexOf('[');
             const endIndex = aiResponseText.lastIndexOf(']');
             
