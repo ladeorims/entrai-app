@@ -27,7 +27,7 @@ const CareersPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Join us in building the future of work.</h1>
                 <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                   Entrai is on a mission to free entrepreneurs from admin overload. We’re a remote-first, impact-driven, and passionate team looking for innovative thinkers to join us.
+                   Entruvi is on a mission to free entrepreneurs from admin overload. We’re a remote-first, impact-driven, and passionate team looking for innovative thinkers to join us.
                 </p>
             </div>
 

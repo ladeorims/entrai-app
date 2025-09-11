@@ -26,7 +26,7 @@ const HowItWorksPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">From sign-up to success in 4 simple steps.</h1>
                  <p className="mt-4 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-2xl mx-auto">
-                    Entrai is designed to be intuitive from day one, helping you streamline your business without a steep learning curve.
+                    Entruvi is designed to be intuitive from day one, helping you streamline your business without a steep learning curve.
                 </p>
             </div>
 
@@ -38,7 +38,7 @@ const HowItWorksPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
                     Once inside, your dashboard gives you a complete picture of your business health. Sales, finance, marketing, and tasks are no longer in separate silos; they're at your fingertips.
                 </Step>
                  <Step icon={<Zap size={28} />} number={3} title="Let Smart Automations Guide You">
-                    As you work, Entrai proactively helps you. Close a deal, and a "Smart Prompt" will ask if you want to create an onboarding task. Add a new client, and it will suggest a follow-up. This is your virtual COO in action.
+                    As you work, Entruvi proactively helps you. Close a deal, and a "Smart Prompt" will ask if you want to create an onboarding task. Add a new client, and it will suggest a follow-up. This is your virtual COO in action.
                 </Step>
                 <Step icon={<Rocket size={28} />} number={4} title="Grow With Ease & Focus">
                     With administrative tasks automated and your business data unified, you can finally stop juggling and start focusing on what truly matters: your vision, your clients, and your growth.
@@ -47,7 +47,7 @@ const HowItWorksPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
 
              <div className="text-center py-20">
                 <button onClick={onStartTrial} className="bg-gradient-to-r from-accent-start to-accent-end text-white font-semibold px-8 py-4 rounded-xl transition shadow-lg hover:opacity-90 text-lg">
-                    See Entrai in Action
+                    See Entruvi in Action
                 </button>
             </div>
         </PublicLayout>

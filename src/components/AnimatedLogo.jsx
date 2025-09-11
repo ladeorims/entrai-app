@@ -51,7 +51,7 @@ const AnimatedLogo = ({ isCollapsed = false }) => {
             <div className="w-10 h-10 flex-shrink-0">
                 {svgContent}
             </div>
-            {!isCollapsed && <h1 className="text-2xl font-bold font-logo hero-gradient-text tracking-wider whitespace-nowrap">Entrai</h1>}
+            {!isCollapsed && <h1 className="text-2xl font-bold font-logo hero-gradient-text tracking-wider whitespace-nowrap">Entruvi</h1>}
         </div>
     );
 };

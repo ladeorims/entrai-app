@@ -56,7 +56,7 @@ const OnboardingModal = ({ user, token, onComplete }) => {
                             <Sparkles size={32} className="text-white"/>
                         </div>
                     </div>
-                    <h1 className="text-2xl font-bold">Welcome to Entrai, {user.name}!</h1>
+                    <h1 className="text-2xl font-bold">Welcome to Entruvi, {user.name}!</h1>
                     <p className="text-text-secondary dark:text-dark-text-secondary mt-2 mb-6">Let's quickly personalize your workspace. (This will only take a minute)</p>
                 </div>
 
@@ -93,7 +93,7 @@ const OnboardingModal = ({ user, token, onComplete }) => {
                     </div>
 
                     <div>
-                         <label className="block text-sm font-bold mb-2">4. What is your main goal with Entrai?</label>
+                         <label className="block text-sm font-bold mb-2">4. What is your main goal with Entruvi?</label>
                          <select name="primaryGoal" value={onboardingData.primaryGoal} onChange={handleChange} className="form-select w-full">
                             <option value="" disabled>Select a goal...</option>
                             <option value="get_paid_faster">Get paid faster</option>

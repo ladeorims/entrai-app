@@ -83,7 +83,7 @@ const PublicFooter = ({ setActiveView }) => {
             <div className="container mx-auto px-5 py-16 max-w-7xl">
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
                     <div className="col-span-2 lg:col-span-2">
-                        <h3 className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-transparent bg-clip-text mb-3">Entrai</h3>
+                        <h3 className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-transparent bg-clip-text mb-3">Entruvi</h3>
                         <p className="text-text-secondary dark:text-dark-text-secondary text-sm max-w-xs">Your virtual COO. Less admin, more growth. Empowering visionaries to focus on what matters.</p>
                     </div>
                     <div>
@@ -112,7 +112,7 @@ const PublicFooter = ({ setActiveView }) => {
                     </div>
                 </div>
                 <div className="mt-16 pt-8 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-text-secondary dark:text-dark-text-secondary">
-                    © {new Date().getFullYear()} Entrai. All rights reserved.
+                    © {new Date().getFullYear()} Entruvi. All rights reserved.
                 </div>
             </div>
         </footer>

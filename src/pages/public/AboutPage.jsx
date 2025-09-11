@@ -9,9 +9,9 @@ const AboutPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
     return (
         <PublicLayout activeView="About" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
-                <h1 className="text-4xl md:text-6xl font-bold">We built Entrai so entrepreneurs can finally focus on what matters.</h1>
+                <h1 className="text-4xl md:text-6xl font-bold">We built Entruvi so entrepreneurs can finally focus on what matters.</h1>
                 <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                    Every entrepreneur knows the struggle: endless admin tasks stealing time from creativity and growth. Entrai was born from that frustration to solve one problem—to build a single, intelligent platform that manages the busywork for you.
+                    Every entrepreneur knows the struggle: endless admin tasks stealing time from creativity and growth. Entruvi was born from that frustration to solve one problem—to build a single, intelligent platform that manages the busywork for you.
                 </p>
             </div>
 

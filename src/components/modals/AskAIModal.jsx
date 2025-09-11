@@ -39,7 +39,7 @@ export const AskAIModal = ({ token, onClose }) => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
             <Card className="max-w-2xl w-full">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2"><Wand2 size={24} className="text-accent-start dark:text-dark-accent-mid"/> Ask Entrai AI</h2>
+                    <h2 className="text-xl font-semibold flex items-center gap-2"><Wand2 size={24} className="text-accent-start dark:text-dark-accent-mid"/> Ask Entruvi AI</h2>
                     <button onClick={onClose}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/></button>
                 </div>
                 <form onSubmit={handleAskAI} className="space-y-4">

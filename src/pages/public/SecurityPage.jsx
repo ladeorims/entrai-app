@@ -21,7 +21,7 @@ const SecurityPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Your business data, safeguarded.</h1>
                 <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                    At Entrai, security isn't an afterthought—it's built into every layer of our platform. We are committed to protecting your most valuable asset: your data.
+                    At Entruvi, security isn't an afterthought—it's built into every layer of our platform. We are committed to protecting your most valuable asset: your data.
                 </p>
             </div>
             

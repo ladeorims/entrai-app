@@ -93,7 +93,7 @@ const AuthPage = ({ onAuth, isLoading, authMessage, setAuthMessage, setActiveVie
             <Card className="max-w-md w-full z-10 shadow-2xl shadow-slate-300/50 dark:shadow-black/30">
                 <div className="flex justify-center items-center gap-2 mb-6">
                     <AnimatedLogo />
-{/*                     <h1 className="text-3xl font-bold hero-gradient-text">Entrai</h1> */}
+{/*                     <h1 className="text-3xl font-bold hero-gradient-text">Entruvi</h1> */}
                 </div>                                                                                                                             
                 <div className="flex justify-center mb-6">
                     <button onClick={() => setIsLoginMode(true)} className={`px-4 py-2 text-sm font-semibold rounded-l-lg transition-all ${isLoginMode ? 'bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700 text-text-secondary dark:text-dark-text-secondary hover:bg-slate-300 dark:hover:bg-slate-600'}`}>Log In</button>

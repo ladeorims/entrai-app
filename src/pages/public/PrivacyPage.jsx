@@ -9,7 +9,7 @@ const PrivacyPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
             <div className="container mx-auto px-5 py-20 max-w-4xl">
                 <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
                 <div className="prose dark:prose-invert max-w-none space-y-6">
-                    <p>At Entrai, we are committed to protecting your privacy and ensuring the security of your data. This policy outlines what information we collect, how we use it, and your rights regarding your data.</p>
+                    <p>At Entruvi, we are committed to protecting your privacy and ensuring the security of your data. This policy outlines what information we collect, how we use it, and your rights regarding your data.</p>
                     
                     <h2 className="text-2xl font-bold">Data We Collect</h2>
                     <p>We collect information necessary to provide our service, including: account information (name, email), billing details (via Stripe), and business data you input (invoices, clients, tasks).</p>

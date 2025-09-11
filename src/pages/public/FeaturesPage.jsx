@@ -20,7 +20,7 @@ const FeaturesPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
             <div className="container mx-auto px-5 py-16 max-w-5xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Run your business on autopilot.</h1>
                 <p className="mt-4 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                    Entrai brings CRM, finance, marketing, and automation into one intelligent platform — so you spend less time on admin and more time on vision.
+                    Entruvi brings CRM, finance, marketing, and automation into one intelligent platform — so you spend less time on admin and more time on vision.
                 </p>
                 <button onClick={onStartTrial} className="mt-8 bg-gradient-to-r from-accent-start to-accent-end text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg hover:opacity-90">
                     Start Free Trial
@@ -37,10 +37,10 @@ const FeaturesPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
                             Create and send invoices, log transactions, and monitor cash flow in real time. Get paid faster with integrated Stripe payments.
                         </FeatureCard>
                         <FeatureCard icon={<Zap className="text-accent-start dark:text-dark-accent-mid" size={28}/>} title="Automation & Insights">
-                            Entrai doesn’t just store your data — it thinks with you. Smart prompts guide your workflow, while AI-powered insights highlight opportunities and risks.
+                            Entruvi doesn’t just store your data — it thinks with you. Smart prompts guide your workflow, while AI-powered insights highlight opportunities and risks.
                         </FeatureCard>
                         <FeatureCard icon={<Bot className="text-accent-start dark:text-dark-accent-mid" size={28}/>} title="Virtual Assistant">
-                            A task manager that works for you. From summarizing documents to scheduling meetings, Entrai suggests your next steps before you even ask.
+                            A task manager that works for you. From summarizing documents to scheduling meetings, Entruvi suggests your next steps before you even ask.
                         </FeatureCard>
                         <FeatureCard icon={<ShieldCheck className="text-accent-start dark:text-dark-accent-mid" size={28}/>} title="Marketing">
                              Plan and track campaigns, manage your content calendar, and generate post ideas with AI. Share directly to your socials with one click.

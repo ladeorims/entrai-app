@@ -80,9 +80,25 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
 
 
 
-// Middleware Setup
+// =========================================================================
+// MIDDLEWARE SETUP
+// =========================================================================
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'];
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+};
+
+// Apply the configured CORS middleware
 app.use(express.json({ limit: '5mb' }));
-app.use(cors());
+app.use(cors(corsOptions));
+
 
 const generateInvoicePDF = async (invoiceId, userId) => {
     const doc = new jsPDF();
@@ -414,10 +430,10 @@ app.post('/api/signup', async (req, res) => {
          const msg = {
             to: email,
             from: 'dami@cytrustadvisory.ca',
-            subject: 'Welcome to Entrai! Please Verify Your Email',
+            subject: 'Welcome to Entruvi! Please Verify Your Email',
             html: `
 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
-    <h2 style="text-align: center;">Welcome to Entrai!</h2>
+    <h2 style="text-align: center;">Welcome to Entruvi!</h2>
     <p>Thanks for signing up. Please click the button below to verify your email address and start your trial.</p>
     <div style="text-align: center; margin: 30px 0;">
         <a href="${verificationUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Verify My Email</a>
@@ -425,7 +441,7 @@ app.post('/api/signup', async (req, res) => {
     <p>If you did not sign up for this account, you can safely ignore this email.</p>
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
     <div style="text-align: center; font-size: 12px; color: #6C757D;">
-        <p>&copy; ${new Date().getFullYear()} Entrai. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} Entruvi. All rights reserved.</p>
         <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
     </div>
 </div>`,
@@ -502,7 +518,7 @@ app.post('/api/forgot-password', async (req, res) => {
         const msg = {
             to: email,
             from: 'dami@cytrustadvisory.ca',
-            subject: 'Password Reset Request for Your Entrai Account',
+            subject: 'Password Reset Request for Your Entruvi Account',
             html: `
 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
     <h2 style="text-align: center;">Password Reset Request</h2>
@@ -513,7 +529,7 @@ app.post('/api/forgot-password', async (req, res) => {
     <p>If you did not request a password reset, you can safely ignore this email.</p>
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
     <div style="text-align: center; font-size: 12px; color: #6C757D;">
-        <p>&copy; ${new Date().getFullYear()} Entrai. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} Entruvi. All rights reserved.</p>
         <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
     </div>
 </div>`,
@@ -782,7 +798,7 @@ app.post('/api/admin/users/:id/trigger-reset', authenticateToken, requireAdmin, 
         const msg = {
             to: userEmail,
             from: 'dami@cytrustadvisory.ca', // Must be a verified sender
-            subject: 'Password Reset for your Entrai Account',
+            subject: 'Password Reset for your Entruvi Account',
             html: `
                 <div style="font-family: sans-serif; text-align: center; padding: 40px;">
                     <h2>Password Reset Request</h2>
@@ -1529,7 +1545,7 @@ app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) =>
 
         // 4. Generate AI analysis
         const prompt = `
-            You are "Entrai AI", an expert business assistant. Your tone is encouraging and professional.
+            You are "Entruvi AI", an expert business assistant. Your tone is encouraging and professional.
             Generate a concise weekly summary email for a user named ${user.name}.
             
             Last Week's Performance:
@@ -1555,7 +1571,7 @@ app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) =>
         const msg = {
             to: user.email,
             from: 'dami@cytrustadvisory.ca', // Must be a verified sender
-            subject: `🚀 Your Weekly Pulse from Entrai`,
+            subject: `🚀 Your Weekly Pulse from Entruvi`,
             html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto;">${emailBody}</div>`
         };
 
@@ -2198,7 +2214,7 @@ app.post('/api/ai/ask', authenticateToken, async (req, res) => {
         const userRes = await pool.query('SELECT name, company, company_description FROM users WHERE id = $1', [userId]);
         const userContext = userRes.rows[0];
 
-        const fullPrompt = `You are "Entrai AI", an expert business assistant for a solo entrepreneur.
+        const fullPrompt = `You are "Entruvi AI", an expert business assistant for a solo entrepreneur.
         The user's name is ${userContext.name} and their business is: "${userContext.company_description}".
         Based on this context, provide a helpful, clear, and concise response to the following user request. Do not be overly verbose.
         

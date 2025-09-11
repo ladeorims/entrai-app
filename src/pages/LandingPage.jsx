@@ -23,7 +23,7 @@ const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan, setActiveView })
                             Stop Juggling. <span className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-transparent bg-clip-text">Start Scaling.</span>
                         </h1>
                         <p className="text-lg lg:text-xl text-text-secondary dark:text-dark-text-secondary mb-8 max-w-2xl mx-auto md:mx-0">
-                            Entrai is the all-in-one co-pilot for solo entrepreneurs. We integrate your sales, marketing, finance, and admin tasks into one intelligent platform, so you can focus on what you do best.
+                            Entruvi is the all-in-one co-pilot for solo entrepreneurs. We integrate your sales, marketing, finance, and admin tasks into one intelligent platform, so you can focus on what you do best.
                         </p>
                         <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start">
                             <button onClick={onStartTrial} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-bold px-6 py-3 rounded-xl transition-transform transform hover:scale-105 shadow-lg">Get Started Free</button>
@@ -33,7 +33,7 @@ const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan, setActiveView })
                     <div className="hidden md:block bg-gradient-to-b from-slate-100 to-slate-200/50 dark:from-slate-800 dark:to-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg p-4">
                         <div className="flex items-center gap-2 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700 mb-3">
                             <div className="flex gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i></div>
-                            <div className="font-bold text-text-secondary dark:text-dark-text-secondary text-sm">Entrai • Dashboard</div>
+                            <div className="font-bold text-text-secondary dark:text-dark-text-secondary text-sm">Entruvi • Dashboard</div>
                         </div>
                         <div className="grid grid-cols-2 gap-3.5">
                             <div className="bg-card-bg dark:bg-dark-card-bg border border-slate-200 dark:border-slate-700 rounded-xl p-3.5"><div className="text-sm text-text-secondary dark:text-dark-text-secondary">Business Health</div><div className="text-3xl font-extrabold mt-1">82<span className="text-sm font-semibold text-green-500">/100</span></div></div>
@@ -58,7 +58,7 @@ const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan, setActiveView })
                 {/* HOW IT WORKS SECTION */}
                 <section id="how" className="py-14">
                     <h2 className="text-4xl lg:text-5xl font-bold text-center mb-3">How it Works</h2>
-                    <p className="text-text-secondary dark:text-dark-text-secondary text-lg text-center mb-12 max-w-2xl mx-auto">From onboarding to automation — Entrai keeps your business flowing.</p>
+                    <p className="text-text-secondary dark:text-dark-text-secondary text-lg text-center mb-12 max-w-2xl mx-auto">From onboarding to automation — Entruvi keeps your business flowing.</p>
                     <div className="grid md:grid-cols-3 gap-6">
                         <Card><h3 className="text-xl font-bold mb-2">1. Onboard & Personalize</h3><p className="text-text-secondary dark:text-dark-text-secondary">Connect your tools, set your goals, and your workspace is tailored automatically.</p></Card>
                         <Card><h3 className="text-xl font-bold mb-2">2. Manage Everything</h3><p className="text-text-secondary dark:text-dark-text-secondary">Use the unified dashboard to see sales, cash flow, and tasks at a glance.</p></Card>
@@ -81,7 +81,7 @@ const LandingPage = ({ onLaunchApp, onStartTrial, onSelectPlan, setActiveView })
                 <section id="faq" className="py-14">
                     <h2 className="text-4xl lg:text-5xl font-bold text-center mb-12">Frequently Asked Questions</h2>
                     <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-4 md:items-start">
-                        <Card><details><summary className="font-bold cursor-pointer">Do I need tech skills to use Entrai?</summary><p className="text-text-secondary dark:text-dark-text-secondary mt-2">No. It’s built for busy entrepreneurs, not developers. The UI is simple, and the AI co-pilot helps at each step.</p></details></Card>
+                        <Card><details><summary className="font-bold cursor-pointer">Do I need tech skills to use Entruvi?</summary><p className="text-text-secondary dark:text-dark-text-secondary mt-2">No. It’s built for busy entrepreneurs, not developers. The UI is simple, and the AI co-pilot helps at each step.</p></details></Card>
                         <Card><details><summary className="font-bold cursor-pointer">Can I invite my team?</summary><p className="text-text-secondary dark:text-dark-text-secondary mt-2">Yes. The Team plan includes up to 5 members with role‑based permissions.</p></details></Card>
                         <Card><details><summary className="font-bold cursor-pointer">How do payments work?</summary><p className="text-text-secondary dark:text-dark-text-secondary mt-2">Subscriptions are handled via Stripe. You can also accept Stripe payments for your invoices.</p></details></Card>
                         <Card><details><summary className="font-bold cursor-pointer">Is my data secure?</summary><p className="text-text-secondary dark:text-dark-text-secondary mt-2">We use industry‑standard security. Email is delivered via SendGrid, and payments via Stripe.</p></details></Card>

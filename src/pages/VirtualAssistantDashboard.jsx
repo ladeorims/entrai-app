@@ -202,9 +202,9 @@ const VirtualAssistantDashboard = ({ token }) => {
         const icsContent = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Entrai.ai//EN',
+            'PRODID:-//Entruvi.ai//EN',
             'BEGIN:VEVENT',
-            `UID:${Date.now()}@entrai.ai`,
+            `UID:${Date.now()}@Entruvi.ai`,
             `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'}`,
             `DTSTART:${startDate}`,
             `DTEND:${endDate}`,
