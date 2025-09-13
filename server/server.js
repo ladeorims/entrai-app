@@ -102,8 +102,9 @@ const corsOptions = {
 };
 
 // Apply the configured CORS middleware
-app.use(express.json({ limit: '5mb' }));
 app.use(cors(corsOptions));
+app.use(express.json({ limit: '5mb' }));
+
 
 
 const generateInvoicePDF = async (invoiceId, userId) => {
@@ -237,22 +238,27 @@ const initializeDatabase = async () => {
         )
     `;
 
-    const alterUsersTableQuery = `
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS company_logo_url TEXT,
-        ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free',
-        ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'inactive',
-        ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS free_automations_used INTEGER DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) DEFAULT 'services',
-        ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS primary_goal VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user',
-        ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE,
-        ALTER COLUMN profile_picture_url TYPE TEXT;
-    `;
+    const alterUsersAddColumnsQuery = `
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS company_logo_url TEXT,
+    ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free',
+    ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'inactive',
+    ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS free_automations_used INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) DEFAULT 'services',
+    ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS primary_goal VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user',
+    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE;
+`;
+
+const alterUsersAlterColumnQuery = `
+    ALTER TABLE users
+    ALTER COLUMN profile_picture_url TYPE TEXT;
+`;
+
     
     const alterInvoicesQuery = `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ;`;
     const alterTasksQuery = `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS recurrence_interval VARCHAR(50);`;
@@ -290,7 +296,8 @@ const initializeDatabase = async () => {
         await pool.query(automationsTableQuery);
         await pool.query(automationActionsTableQuery);
         await pool.query(clientInteractionsTableQuery);
-        await pool.query(alterUsersTableQuery);
+        await pool.query(alterUsersAddColumnsQuery);
+        await pool.query(alterUsersAlterColumnQuery);
         await pool.query(alterInvoicesQuery);
         await pool.query(alterTasksQuery);
         await pool.query(intakeFormsTableQuery);
