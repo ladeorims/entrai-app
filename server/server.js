@@ -214,104 +214,277 @@ const pool = new pg.Pool(
 );
 
 const initializeDatabase = async () => {
-    const userTableQuery = `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, name VARCHAR(255), company VARCHAR(255), phone_number VARCHAR(20), address VARCHAR(255), city_province_postal VARCHAR(255), is_verified BOOLEAN DEFAULT FALSE, profile_picture_url TEXT, company_description TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const clientsTableQuery = `CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, phone_number VARCHAR(20), company_name VARCHAR(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CONSTRAINT unique_client_email_per_user UNIQUE (user_id, email))`;
-    const salesDealsTableQuery = `CREATE TABLE IF NOT EXISTS sales_deals (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, value NUMERIC(12, 2) NOT NULL, stage VARCHAR(50) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const dealNotesTableQuery = `CREATE TABLE IF NOT EXISTS deal_notes (id SERIAL PRIMARY KEY, deal_id INTEGER NOT NULL REFERENCES sales_deals(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, note TEXT NOT NULL, type VARCHAR(50), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const tasksTableQuery = `CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, status VARCHAR(50) DEFAULT 'incomplete', priority VARCHAR(50) DEFAULT 'Medium', due_date TIMESTAMPTZ, is_deleted BOOLEAN DEFAULT FALSE, is_recurring BOOLEAN DEFAULT FALSE, recurrence_interval VARCHAR(50), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const transactionsTableQuery = `CREATE TABLE IF NOT EXISTS transactions (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, title VARCHAR(255) NOT NULL, amount NUMERIC(12, 2) NOT NULL, type VARCHAR(50) NOT NULL, category VARCHAR(100), transaction_date TIMESTAMPTZ NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const campaignsTableQuery = `CREATE TABLE IF NOT EXISTS campaigns (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, platform VARCHAR(100), ad_spend NUMERIC(12, 2) DEFAULT 0, reach INTEGER DEFAULT 0, engagement INTEGER DEFAULT 0, conversions INTEGER DEFAULT 0, start_date TIMESTAMPTZ, end_date TIMESTAMPTZ, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const contentCalendarTableQuery = `CREATE TABLE IF NOT EXISTS content_calendar (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, post_text TEXT, platform VARCHAR(100), status VARCHAR(50) DEFAULT 'draft', post_date TIMESTAMPTZ, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const invoicesTableQuery = `CREATE TABLE IF NOT EXISTS invoices (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, invoice_number VARCHAR(100) NOT NULL, issue_date TIMESTAMPTZ NOT NULL, due_date TIMESTAMPTZ NOT NULL, total_amount NUMERIC(12, 2) NOT NULL, status VARCHAR(50) DEFAULT 'draft', notes TEXT, tax_rate NUMERIC(5, 2) DEFAULT 0.00, tax_amount NUMERIC(12, 2) DEFAULT 0.00, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const invoiceLineItemsTableQuery = `CREATE TABLE IF NOT EXISTS invoice_line_items (id SERIAL PRIMARY KEY, invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE, description TEXT NOT NULL, quantity NUMERIC(10, 2) NOT NULL, unit_price NUMERIC(12, 2) NOT NULL, total NUMERIC(12, 2) NOT NULL)`;
-    const automationsTableQuery = `CREATE TABLE IF NOT EXISTS automations (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, trigger_type VARCHAR(100) NOT NULL, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const automationActionsTableQuery = `CREATE TABLE IF NOT EXISTS automation_actions (id SERIAL PRIMARY KEY, automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE, action_type VARCHAR(100) NOT NULL, params JSONB)`;
-    const clientInteractionsTableQuery = `
-        CREATE TABLE IF NOT EXISTS client_interactions (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL, -- Optional link to a deal
-            type VARCHAR(50) NOT NULL, -- e.g., 'email', 'note', 'call'
-            content TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+  const userTableQuery = `
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      name VARCHAR(255),
+      company VARCHAR(255),
+      phone_number VARCHAR(20),
+      address VARCHAR(255),
+      city_province_postal VARCHAR(255),
+      is_verified BOOLEAN DEFAULT FALSE,
+      profile_picture_url TEXT,
+      company_description TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
-    const alterUsersAddColumnsQuery = `
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS company_logo_url TEXT,
-    ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free',
-    ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'inactive',
-    ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS free_automations_used INTEGER DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) DEFAULT 'services',
-    ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS primary_goal VARCHAR(255),
-    ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user',
-    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE;
-`;
+  const clientsTableQuery = `
+    CREATE TABLE IF NOT EXISTS clients (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(20),
+      company_name VARCHAR(255),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_client_email_per_user UNIQUE (user_id, email)
+    )
+  `;
 
-const alterUsersAlterColumnQuery = `
-    ALTER TABLE users
-    ALTER COLUMN profile_picture_url TYPE TEXT;
-`;
+  const salesDealsTableQuery = `
+    CREATE TABLE IF NOT EXISTS sales_deals (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      value NUMERIC(12, 2) NOT NULL,
+      stage VARCHAR(50) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
-    
-    const alterInvoicesQuery = `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ;`;
-    const alterTasksQuery = `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS recurrence_interval VARCHAR(50);`;
-    const intakeFormsTableQuery = `CREATE TABLE IF NOT EXISTS intake_forms (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, questions JSONB NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id))`;
-    const formSubmissionsTableQuery = `CREATE TABLE IF NOT EXISTS form_submissions (id SERIAL PRIMARY KEY, form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE, responses JSONB NOT NULL, client_name VARCHAR(255), client_email VARCHAR(255), submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
-    const userGoalsTableQuery = `
-        CREATE TABLE IF NOT EXISTS user_goals (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-            revenue_goal NUMERIC(12, 2) DEFAULT 0,
-            new_clients_goal INTEGER DEFAULT 0,
-            deals_won_goal INTEGER DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-    `;
+  const dealNotesTableQuery = `
+    CREATE TABLE IF NOT EXISTS deal_notes (
+      id SERIAL PRIMARY KEY,
+      deal_id INTEGER NOT NULL REFERENCES sales_deals(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      note TEXT NOT NULL,
+      type VARCHAR(50),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
-    const alterTransactionsQuery = `
-        ALTER TABLE transactions
-        ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business';
-    `;
-    
+  const tasksTableQuery = `
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      status VARCHAR(50) DEFAULT 'incomplete',
+      priority VARCHAR(50) DEFAULT 'Medium',
+      due_date TIMESTAMPTZ,
+      is_deleted BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
-    try {
-        await pool.query(userTableQuery);
-        await pool.query(clientsTableQuery);
-        await pool.query(salesDealsTableQuery);
-        await pool.query(dealNotesTableQuery);
-        await pool.query(tasksTableQuery);
-        await pool.query(transactionsTableQuery);
-        await pool.query(campaignsTableQuery);
-        await pool.query(contentCalendarTableQuery);
-        await pool.query(invoicesTableQuery);
-        await pool.query(invoiceLineItemsTableQuery);
-        await pool.query(automationsTableQuery);
-        await pool.query(automationActionsTableQuery);
-        await pool.query(clientInteractionsTableQuery);
-        await pool.query(alterUsersAddColumnsQuery);
-        await pool.query(alterUsersAlterColumnQuery);
-        await pool.query(alterInvoicesQuery);
-        await pool.query(alterTasksQuery);
-        await pool.query(intakeFormsTableQuery);
-        await pool.query(formSubmissionsTableQuery);
-        await pool.query(userGoalsTableQuery);
-        await pool.query(alterTransactionsQuery); 
+  const transactionsTableQuery = `
+    CREATE TABLE IF NOT EXISTS transactions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      amount NUMERIC(12, 2) NOT NULL,
+      type VARCHAR(50) NOT NULL,
+      category VARCHAR(100),
+      transaction_date TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
-        console.log('All tables created or already exist.');
-        console.log('Schema updates successful.');
-    } catch (err) {
-        console.error('Error during database initialization:', err);
-        throw err;
-    }
+  const campaignsTableQuery = `
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      platform VARCHAR(100),
+      ad_spend NUMERIC(12, 2) DEFAULT 0,
+      reach INTEGER DEFAULT 0,
+      engagement INTEGER DEFAULT 0,
+      conversions INTEGER DEFAULT 0,
+      start_date TIMESTAMPTZ,
+      end_date TIMESTAMPTZ,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const contentCalendarTableQuery = `
+    CREATE TABLE IF NOT EXISTS content_calendar (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      post_text TEXT,
+      platform VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'draft',
+      post_date TIMESTAMPTZ,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const invoicesTableQuery = `
+    CREATE TABLE IF NOT EXISTS invoices (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      invoice_number VARCHAR(100) NOT NULL,
+      issue_date TIMESTAMPTZ NOT NULL,
+      due_date TIMESTAMPTZ NOT NULL,
+      total_amount NUMERIC(12, 2) NOT NULL,
+      status VARCHAR(50) DEFAULT 'draft',
+      notes TEXT,
+      tax_rate NUMERIC(5, 2) DEFAULT 0.00,
+      tax_amount NUMERIC(12, 2) DEFAULT 0.00,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const invoiceLineItemsTableQuery = `
+    CREATE TABLE IF NOT EXISTS invoice_line_items (
+      id SERIAL PRIMARY KEY,
+      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      quantity NUMERIC(10, 2) NOT NULL,
+      unit_price NUMERIC(12, 2) NOT NULL,
+      total NUMERIC(12, 2) NOT NULL
+    )
+  `;
+
+  const automationsTableQuery = `
+    CREATE TABLE IF NOT EXISTS automations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      trigger_type VARCHAR(100) NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const automationActionsTableQuery = `
+    CREATE TABLE IF NOT EXISTS automation_actions (
+      id SERIAL PRIMARY KEY,
+      automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+      action_type VARCHAR(100) NOT NULL,
+      params JSONB
+    )
+  `;
+
+  const clientInteractionsTableQuery = `
+    CREATE TABLE IF NOT EXISTS client_interactions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL,
+      type VARCHAR(50) NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Break ALTER TABLE users into separate statements
+  const alterUsersQueries = [
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo_url TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'inactive'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS free_automations_used INTEGER DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) DEFAULT 'services'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS primary_goal VARCHAR(255)`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE`,
+    `ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`
+  ];
+
+  const alterInvoicesQuery = `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ`;
+
+  // Break ALTER TABLE tasks into separate statements
+  const alterTasksQueries = [
+    `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_interval VARCHAR(50)`
+  ];
+
+  const intakeFormsTableQuery = `
+    CREATE TABLE IF NOT EXISTS intake_forms (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      questions JSONB NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id)
+    )
+  `;
+
+  const formSubmissionsTableQuery = `
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id SERIAL PRIMARY KEY,
+      form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE,
+      responses JSONB NOT NULL,
+      client_name VARCHAR(255),
+      client_email VARCHAR(255),
+      submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const userGoalsTableQuery = `
+    CREATE TABLE IF NOT EXISTS user_goals (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      revenue_goal NUMERIC(12, 2) DEFAULT 0,
+      new_clients_goal INTEGER DEFAULT 0,
+      deals_won_goal INTEGER DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const alterTransactionsQuery = `
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'
+  `;
+
+  try {
+    // Base tables
+    await pool.query(userTableQuery);
+    await pool.query(clientsTableQuery);
+    await pool.query(salesDealsTableQuery);
+    await pool.query(dealNotesTableQuery);
+    await pool.query(tasksTableQuery);
+    await pool.query(transactionsTableQuery);
+    await pool.query(campaignsTableQuery);
+    await pool.query(contentCalendarTableQuery);
+    await pool.query(invoicesTableQuery);
+    await pool.query(invoiceLineItemsTableQuery);
+    await pool.query(automationsTableQuery);
+    await pool.query(automationActionsTableQuery);
+    await pool.query(clientInteractionsTableQuery);
+
+    // Schema updates
+    for (const query of alterUsersQueries) {
+      await pool.query(query);
+    }
+
+    await pool.query(alterInvoicesQuery);
+
+    for (const query of alterTasksQueries) {
+      await pool.query(query);
+    }
+
+    await pool.query(intakeFormsTableQuery);
+    await pool.query(formSubmissionsTableQuery);
+    await pool.query(userGoalsTableQuery);
+    await pool.query(alterTransactionsQuery);
+
+    console.log('All tables created or already exist.');
+    console.log('Schema updates successful.');
+  } catch (err) {
+    console.error('Error during database initialization:', err);
+    throw err;
+  }
 };
+
 
 
 
