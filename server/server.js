@@ -85,7 +85,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
 // =========================================================================
 // FIX: Ensure CORS_ORIGIN is correctly defined and handle multiple origins
 const corsOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'];
-corsOrigins.push('https://entruvi.com', 'https://www.entruvi.com'); // Add Vercel production domains
+corsOrigins.push('https://entruvi.vercel.app', 'https://www.entruvi.vercel.app'); // Add Vercel production domains
 
 const corsOptions = {
     origin: (origin, callback) => {
@@ -102,9 +102,8 @@ const corsOptions = {
 };
 
 // Apply the configured CORS middleware
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
-
+app.use(cors(corsOptions));
 
 
 const generateInvoicePDF = async (invoiceId, userId) => {
@@ -306,6 +305,7 @@ const initializeDatabase = async () => {
         throw err;
     }
 };
+
 
 
 // =========================================================================
