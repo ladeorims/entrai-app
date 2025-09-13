@@ -752,38 +752,41 @@ app.post('/api/reset-password', async (req, res) => {
 
 
 // ➡️ NEW: GET endpoint to fetch the full user profile.
+// ➡️ GET endpoint to fetch the full user profile
 app.get('/api/profile', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        // Use SQL aliasing to convert snake_case columns to camelCase keys in the JSON response
-        const result = await pool.query(
-            `SELECT 
-                id, 
-                name, 
-                email, 
-                company, 
-                phone_number AS "phoneNumber", 
-                profile_picture_url AS "profilePictureUrl", 
-                company_description AS "companyDescription",
-                company_logo_url AS "companyLogoUrl",
-                address,
-                city_province_postal AS "cityProvincePostal",
-                plan_type AS "planType",
-                subscription_status AS "subscriptionStatus",
-                trial_ends_at AS "trialEndsAt",
-                role,
-                weekly_pulse_enabled AS "weeklyPulseEnabled"
-            FROM users WHERE id = $1`, 
-            [userId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error fetching profile:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT 
+                id, 
+                name, 
+                email, 
+                company, 
+                phone_number AS "phoneNumber", 
+                profile_picture_url AS "profilePictureUrl", 
+                company_description AS "companyDescription",
+                company_logo_url AS "companyLogoUrl",
+                address,
+                city_province_postal AS "cityProvincePostal",
+                plan_type AS "planType",
+                subscription_status AS "subscriptionStatus",
+                trial_ends_at AS "trialEndsAt",
+                role,
+                weekly_pulse_enabled AS "weeklyPulseEnabled"
+            FROM users 
+            WHERE id = $1;
+        `;
+        console.log("Running query [profile]:", query, "with userId:", userId);
+
+        const result = await pool.query(query, [userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching profile:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // UPDATED: PUT /api/profile also returns consistent camelCase keys
@@ -1283,29 +1286,32 @@ app.get('/api/crm/clients/:id', authenticateToken, async (req, res) => {
 });
 
 // NEW: Endpoint specifically for the CRM to get a list of all clients
+// ➡️ Endpoint for CRM to get all clients
 app.get('/api/crm/clients', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const query = `
-            SELECT 
-                c.id, 
-                c.name, 
-                c.email, 
-                c.company_name AS "companyName",
-                COUNT(sd.id) AS deal_count,
-                COALESCE(SUM(CASE WHEN sd.stage = 'Closed Won' THEN sd.value ELSE 0 END), 0) AS total_value
-            FROM clients c
-            LEFT JOIN sales_deals sd ON c.id = sd.client_id
-            WHERE c.user_id = $1
-            GROUP BY c.id
-            ORDER BY c.name ASC;
-        `;
-        const clients = await pool.query(query, [userId]);
-        res.status(200).json(clients.rows);
-    } catch (err) {
-        console.error('Error fetching CRM client list:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT 
+                c.id, 
+                c.name, 
+                c.email, 
+                c.company_name AS "companyName",
+                COUNT(sd.id) AS deal_count,
+                COALESCE(SUM(CASE WHEN sd.stage = 'Closed Won' THEN sd.value ELSE 0 END), 0) AS total_value
+            FROM clients c
+            LEFT JOIN sales_deals sd ON c.id = sd.client_id
+            WHERE c.user_id = $1
+            GROUP BY c.id
+            ORDER BY c.name ASC;
+        `;
+        console.log("Running query [crm/clients]:", query, "with userId:", userId);
+
+        const clients = await pool.query(query, [userId]);
+        res.status(200).json(clients.rows);
+    } catch (err) {
+        console.error('Error fetching CRM client list:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // NEW: Endpoint to get all details for a single client
@@ -1536,36 +1542,40 @@ app.post('/api/sales/deals/:dealId/notes', authenticateToken, async (req, res) =
 // =========================================================================
 // ANALYTICS API ROUTES (NEW)
 // =========================================================================
+// ➡️ Endpoint for client profitability analytics
 app.get('/api/analytics/client-profitability', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const query = `
-            SELECT 
-                c.id, 
-                c.name,
-                COUNT(sd.id) AS deals_won,
-                COALESCE(SUM(sd.value), 0) AS total_value
-            FROM clients c
-            LEFT JOIN sales_deals sd ON c.id = sd.client_id AND sd.stage = 'Closed Won'
-            WHERE c.user_id = $1
-            GROUP BY c.id
-            HAVING COALESCE(SUM(sd.value), 0) > 0
-            ORDER BY total_value DESC;
-        `;
-        const result = await pool.query(query, [userId]);
-        
-        const profitabilityData = result.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            dealsWon: parseInt(row.deals_won, 10),
-            totalValue: parseFloat(row.total_value)
-        }));
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT 
+                c.id, 
+                c.name,
+                COUNT(sd.id) AS deals_won,
+                COALESCE(SUM(sd.value), 0) AS total_value
+            FROM clients c
+            LEFT JOIN sales_deals sd 
+                ON c.id = sd.client_id 
+                AND sd.stage = 'Closed Won'
+            WHERE c.user_id = $1
+            GROUP BY c.id
+            HAVING COALESCE(SUM(sd.value), 0) > 0
+            ORDER BY total_value DESC;
+        `;
+        console.log("Running query [analytics/client-profitability]:", query, "with userId:", userId);
 
-        res.status(200).json({ profitabilityData });
-    } catch (err) {
-        console.error('Error fetching client profitability data:', err);
-        res.status(500).json({ message: 'Server error while fetching analytics data.' });
-    }
+        const result = await pool.query(query, [userId]);
+        const profitabilityData = result.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            dealsWon: parseInt(row.deals_won, 10),
+            totalValue: parseFloat(row.total_value)
+        }));
+
+        res.status(200).json({ profitabilityData });
+    } catch (err) {
+        console.error('Error fetching client profitability data:', err);
+        res.status(500).json({ message: 'Server error while fetching analytics data.' });
+    }
 });
 
 
@@ -2377,27 +2387,39 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
     }
 });
 
+// ➡️ Endpoint for recent dashboard activity
 app.get('/api/dashboard/recent-activity', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const query = `
-            SELECT 'DEAL' as type, sd.name as description, sd.stage as status, sd.value as amount, sd.created_at as timestamp
-            FROM sales_deals sd WHERE sd.user_id = $1
-            UNION ALL
-            SELECT 'TASK' as type, t.title as description, t.status as status, NULL as amount, t.created_at as timestamp
-            FROM tasks t WHERE t.user_id = $1 AND t.is_deleted = FALSE
-            UNION ALL
-            SELECT 'INVOICE' as type, CONCAT('Invoice ', i.invoice_number, ' to ', c.name) as description, i.status as status, i.total_amount as amount, i.created_at as timestamp
-            FROM invoices i JOIN clients c ON i.client_id = c.id WHERE i.user_id = $1
-            ORDER BY timestamp DESC
-            LIMIT 10;
-        `;
-        const activityResult = await pool.query(query, [userId]);
-        res.status(200).json(activityResult.rows);
-    } catch (err) {
-        console.error('Error fetching recent activity:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT 'DEAL' AS type, sd.name AS description, sd.stage AS status, sd.value AS amount, sd.created_at AS timestamp
+            FROM sales_deals sd 
+            WHERE sd.user_id = $1
+
+            UNION ALL
+
+            SELECT 'TASK' AS type, t.title AS description, t.status AS status, NULL AS amount, t.created_at AS timestamp
+            FROM tasks t 
+            WHERE t.user_id = $1 AND t.is_deleted = FALSE
+
+            UNION ALL
+
+            SELECT 'INVOICE' AS type, CONCAT('Invoice ', i.invoice_number, ' to ', c.name) AS description, i.status AS status, i.total_amount AS amount, i.created_at AS timestamp
+            FROM invoices i 
+            JOIN clients c ON i.client_id = c.id 
+            WHERE i.user_id = $1
+
+            ORDER BY timestamp DESC
+            LIMIT 10;
+        `;
+        console.log("Running query [dashboard/recent-activity]:", query, "with userId:", userId);
+
+        const activityResult = await pool.query(query, [userId]);
+        res.status(200).json(activityResult.rows);
+    } catch (err) {
+        console.error('Error fetching recent activity:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // NEW: AI endpoint to generate a dynamic status message based on health score
