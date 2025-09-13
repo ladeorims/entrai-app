@@ -251,7 +251,7 @@ const initializeDatabase = async () => {
         ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user',
         ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE, 
+        ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE,
         ALTER COLUMN profile_picture_url TYPE TEXT;
     `;
     
