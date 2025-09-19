@@ -742,37 +742,37 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 app.get('/api/profile', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const query = `
-            SELECT
-                id,
-                name,
-                email,
-                company,
-                phone_number AS "phoneNumber",
-                profile_picture_url AS "profilePictureUrl",
-                company_description AS "companyDescription",
-                company_logo_url AS "companyLogoUrl",
-                address,
-                city_province_postal AS "cityProvincePostal",
-                plan_type AS "planType",
-                subscription_status AS "subscriptionStatus",
-                subscription_start_date AS "subscriptionStartDate",
-                role,
-                weekly_pulse_enabled AS "weeklyPulseEnabled"
-            FROM users
-            WHERE id = $1;
-        `;
-        const result = await pool.query(query, [userId]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error fetching profile:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT
+                id,
+                name,
+                email,
+                company,
+                phone_number AS "phoneNumber",
+                profile_picture_url AS "profilePictureUrl",
+                company_description AS "companyDescription",
+                company_logo_url AS "companyLogoUrl",
+                address,
+                city_province_postal AS "cityProvincePostal",
+                plan_type AS "planType",
+                subscription_status AS "subscriptionStatus",
+                subscription_start_date AS "subscriptionStartDate",
+                role,
+                weekly_pulse_enabled AS "weeklyPulseEnabled"
+            FROM users
+            WHERE id = $1
+        `;
+        const result = await pool.query(query, [userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching profile:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.put('/api/profile', authenticateToken, async (req, res) => {
