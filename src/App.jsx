@@ -5,7 +5,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import { Search, LayoutDashboard, DollarSign, Bot, Megaphone, Briefcase, Settings, LogOut, ChevronLeft, ChevronRight, Sun, Star, Moon, Bell, XCircle, ShieldCheck, Users, Menu, BarChart3, Loader2 } from 'lucide-react';
 import { AuthContext, useAuth } from './AuthContext';
 
-import WaitlistPage from './pages/WaitlistPage'; 
+// import WaitlistPage from './pages/WaitlistPage'; 
 import NavItem from './components/layout/NavItem';
 import AnimatedLogo from './components/AnimatedLogo';
 import OnboardingModal from './components/OnboardingModal';
@@ -365,7 +365,7 @@ const AppRoutes = () => {
         <Routes>
           {/* Public Pages */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
-          <Route path="/waitlist" element={<WaitlistPage />} />
+          {/* <Route path="/waitlist" element={<WaitlistPage />} /> */}
           <Route path="/auth" element={isAuthenticated ? <Navigate to="/dashboard" /> : <AuthPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/features" element={isAuthenticated ? <Navigate to="/dashboard" /> : <FeaturesPage />} />
