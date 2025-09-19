@@ -492,7 +492,16 @@ const initializeDatabase = async () => {
         ON CONFLICT (email) DO UPDATE SET role = 'admin', password = $2;
     `;
 
+        const addMissingUserColumns = `
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+    `;
+
     try {
+        await pool.query(addMissingUserColumns);
         await pool.query(userTableQuery);
         await pool.query(waitlistTableQuery);
         await pool.query(clientsTableQuery);
