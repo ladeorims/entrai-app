@@ -1920,20 +1920,20 @@ app.delete('/api/tasks/:taskId/permanent', authenticateToken, async (req, res) =
 
 // ➡️ NEW: GET notifications for overdue and upcoming tasks
 app.get('/api/notifications', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const notifications = await pool.query(
-            `SELECT id, title, due_date AS "dueDate"
-             FROM tasks
-             WHERE user_id = $1 AND is_deleted = FALSE AND status = 'incomplete' AND due_date IS NOT NULL AND due_date <= NOW()
-             ORDER BY due_date DESC`,
-            [userId]
-        );
-        res.status(200).json(notifications.rows);
-    } catch (err) {
-        console.error('Error fetching notifications:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const notifications = await pool.query(
+            `SELECT id, title, due_date AS "dueDate"
+            FROM tasks
+            WHERE user_id = $1 AND is_deleted = FALSE AND status = 'incomplete' AND due_date IS NOT NULL AND due_date <= NOW()
+            ORDER BY due_date DESC`,
+            [userId]
+        );
+        res.status(200).json(notifications.rows);
+    } catch (err) {
+        console.error('Error fetching notifications:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // ➡️ NEW: FINANCE API ROUTES
