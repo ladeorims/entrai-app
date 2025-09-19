@@ -1,11 +1,9 @@
-// src/pages/public/PrivacyPage.jsx
-
 import React from 'react';
 import PublicLayout from './PublicLayout';
 
-const PrivacyPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
+const PrivacyPage = () => {
     return (
-        <PublicLayout activeView="Privacy" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
+        <PublicLayout>
             <div className="container mx-auto px-5 py-20 max-w-4xl">
                 <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
                 <div className="prose dark:prose-invert max-w-none space-y-6">
@@ -20,7 +18,7 @@ const PrivacyPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
                     <h2 className="text-2xl font-bold">Third-Party Services</h2>
                     <p>We use trusted third-party services like Stripe for payments, SendGrid for emails, and OpenAI for AI features. Each service has its own robust privacy and security policies.</p>
 
-                     <h2 className="text-2xl font-bold">Your Rights</h2>
+                    <h2 className="text-2xl font-bold">Your Rights</h2>
                     <p>You have the right to access, update, or delete your data at any time through your account settings or by contacting our support team.</p>
                 </div>
             </div>

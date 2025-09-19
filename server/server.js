@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-irregular-whitespace */
 /* eslint-disable no-undef */
 // =========================================================================
@@ -19,6 +20,8 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import Stripe from 'stripe';
 
+const strongPasswordRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{12,})");
+
 dotenv.config();
 
 const app = express();
@@ -28,7 +31,7 @@ const PORT = process.env.PORT || 3001;
 // STRIPE WEBHOOK LISTENER
 // This route must come BEFORE express.json() to receive the raw request body
 // =========================================================================
-app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     let event;
@@ -40,56 +43,37 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const customerEmail = session.customer_details.email;
-        
         console.log(`🔔 Payment successful for checkout session. Customer email: ${customerEmail}`);
-        
-        // Retrieve subscription to get the plan details
-        const subscription = await stripe.subscriptions.retrieve(session.subscription);
-        const priceId = subscription.items.data[0].price.id;
-
-        let planType = 'free'; // Default
-        if (priceId === process.env.STRIPE_SOLO_PLAN_PRICE_ID) {
-            planType = 'solo';
-        } else if (priceId === process.env.STRIPE_TEAM_PLAN_PRICE_ID) {
-            planType = 'team';
-        }
-
         try {
             const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [customerEmail]);
             if (userRes.rows.length > 0) {
                 const userId = userRes.rows[0].id;
                 await pool.query(
-                    `UPDATE users SET subscription_status = 'active', plan_type = $1, trial_ends_at = NULL WHERE id = $2`,
-                    [planType, userId]
+                    `UPDATE users SET subscription_status = 'active', plan_type = $1, subscription_start_date = NOW() WHERE id = $2`,
+                    [session.metadata.plan_type, userId]
                 );
-                console.log(`✅ Subscription for user ${userId} updated to '${planType}' and status to 'active'`);
+                console.log(`✅ Subscription for user ${userId} updated to '${session.metadata.plan_type}' and status to 'active'`);
             } else {
-                 console.error(`Webhook Error: No user found with email ${customerEmail}`);
+                console.error(`Webhook Error: No user found with email ${customerEmail}`);
             }
         } catch (dbError) {
             console.error('Error updating user subscription in database:', dbError);
         }
     }
-
     res.status(200).json({ received: true });
 });
-
-
 
 // =========================================================================
 // MIDDLEWARE SETUP
 // =========================================================================
-// FIX: Ensure CORS_ORIGIN is correctly defined and handle multiple origins
-const corsOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'];
-corsOrigins.push('https://entruvi.com', 'https://www.entruvi.com'); // Add Vercel production domains
+const corsOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:5173'];
+corsOrigins.push('https://entruvi.com', 'https://www.entruvi.com');
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) {
             return callback(null, true);
         }
@@ -101,32 +85,91 @@ const corsOptions = {
     },
 };
 
-// Apply the configured CORS middleware
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 
+// Middleware for authentication, role checking, and data scoping
+const authenticateToken = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userRes = await pool.query('SELECT role, email, plan_type, team_id, id FROM users WHERE id = $1', [decoded.userId]);
+        if (userRes.rows.length === 0) return res.sendStatus(403);
+        req.user = {
+            ...decoded,
+            role: userRes.rows[0].role,
+            email: userRes.rows[0].email,
+            planType: userRes.rows[0].plan_type,
+            team_id: userRes.rows[0].team_id,
+            userId: userRes.rows[0].id
+        };
+        next();
+    } catch (err) {
+        return res.sendStatus(403);
+    }
+};
 
+const requireAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Forbidden: Admin access required.' });
+    }
+};
+
+const teamDataMiddleware = async (req, res, next) => {
+    if (req.user && req.user.team_id) {
+        req.user.dataScopeIds = [req.user.team_id];
+    } else if (req.user) {
+        req.user.dataScopeIds = [req.user.userId];
+    } else {
+        return res.sendStatus(401);
+    }
+    next();
+};
+
+const checkSubscription = (allowedPlans) => {
+    return async (req, res, next) => {
+        const { userId } = req.user;
+        try {
+            const userRes = await pool.query('SELECT plan_type, subscription_status, subscription_start_date FROM users WHERE id = $1', [userId]);
+            if (userRes.rows.length === 0) {
+                return res.status(404).json({ message: "User not found." });
+            }
+            const user = userRes.rows[0];
+            const hasActiveSub = user.subscription_status === 'active';
+            const isBeta = user.subscription_status === 'beta';
+            if (hasActiveSub || isBeta) {
+                if (allowedPlans.includes(user.plan_type) || isBeta) {
+                    req.user.plan = user;
+                    return next();
+                } else {
+                    return res.status(403).json({ message: `Upgrade to a ${allowedPlans.join(' or ')} plan to access this feature.` });
+                }
+            } else {
+                return res.status(403).json({ message: "Your subscription is inactive. Please upgrade to continue." });
+            }
+        } catch (error) {
+            console.error("Subscription check error:", error);
+            return res.status(500).json({ message: "Server error during subscription check." });
+        }
+    };
+};
 
 const generateInvoicePDF = async (invoiceId, userId) => {
     const doc = new jsPDF();
-
-    // Fetch all necessary data in one go
     const userRes = await pool.query('SELECT name, company, email, phone_number, address, city_province_postal, company_logo_url FROM users WHERE id = $1', [userId]);
     const invoiceRes = await pool.query('SELECT i.*, c.name as client_name, c.email as client_email FROM invoices i JOIN clients c ON i.client_id = c.id WHERE i.id = $1 AND i.user_id = $2', [invoiceId, userId]);
     const lineItemsRes = await pool.query('SELECT * FROM invoice_line_items WHERE invoice_id = $1', [invoiceId]);
-
     if (invoiceRes.rows.length === 0 || userRes.rows.length === 0) {
         throw new Error('Invoice or user not found');
     }
-
     const user = userRes.rows[0];
     const invoice = invoiceRes.rows[0];
     invoice.lineItems = lineItemsRes.rows;
-
-    // --- Start Building PDF ---
-
-    // Add Company Logo if it exists
-     if (user.company_logo_url) {
+    if (user.company_logo_url) {
         try {
             const imgData = user.company_logo_url;
             doc.addImage(imgData, 'PNG', 14, 15, 30, 15);
@@ -134,8 +177,6 @@ const generateInvoicePDF = async (invoiceId, userId) => {
             console.error("Could not add logo to PDF:", e);
         }
     }
-
-    // Add Company Info
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.text(user.company || user.name, 14, 40);
@@ -143,8 +184,6 @@ const generateInvoicePDF = async (invoiceId, userId) => {
     doc.setFontSize(10);
     doc.text(user.address || '', 14, 46);
     doc.text(user.city_province_postal || '', 14, 50);
-
-    // Add Invoice Details
     doc.setFontSize(26);
     doc.setFont(undefined, 'bold');
     doc.text("INVOICE", 200, 22, { align: 'right' });
@@ -153,17 +192,12 @@ const generateInvoicePDF = async (invoiceId, userId) => {
     doc.text(`Invoice #: ${invoice.invoice_number}`, 200, 40, { align: 'right' });
     doc.text(`Issue Date: ${new Date(invoice.issue_date).toLocaleDateString()}`, 200, 46, { align: 'right' });
     doc.text(`Due Date: ${new Date(invoice.due_date).toLocaleDateString()}`, 200, 52, { align: 'right' });
-    
-    // Add Client Info
     doc.text("Bill To:", 14, 70);
     doc.setFont(undefined, 'bold');
     doc.text(invoice.client_name, 14, 76);
-
-    // Add Line Items Table
-    const tableColumn = user.business_type === 'goods' 
-        ? ["Item", "Quantity", "Unit Price", "Total"] 
+    const tableColumn = user.business_type === 'goods'
+        ? ["Item", "Quantity", "Unit Price", "Total"]
         : ["Service", "Amount"];
-    
     const tableRows = [];
     invoice.lineItems.forEach(item => {
         const itemData = user.business_type === 'goods'
@@ -171,19 +205,14 @@ const generateInvoicePDF = async (invoiceId, userId) => {
             : [item.description, `$${Number(item.total).toFixed(2)}`];
         tableRows.push(itemData);
     });
-
     autoTable(doc, { head: [tableColumn], body: tableRows, startY: 85, theme: 'striped' });
-
-
     const finalY = doc.lastAutoTable.finalY || 150;
-
     doc.setFontSize(12);
     doc.text(`Subtotal: $${(invoice.total_amount - invoice.tax_amount).toFixed(2)}`, 200, finalY + 15, { align: 'right' });
     doc.text(`Tax (${invoice.tax_rate}%): $${Number(invoice.tax_amount).toFixed(2)}`, 200, finalY + 22, { align: 'right' });
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
     doc.text(`Total: $${Number(invoice.total_amount).toLocaleString()}`, 200, finalY + 30, { align: 'right' });
-
     return Buffer.from(doc.output('arraybuffer'));
 };
 
@@ -215,248 +244,257 @@ const pool = new pg.Pool(
 
 const initializeDatabase = async () => {
     const userTableQuery = `
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password VARCHAR(255) NOT NULL,
-      name VARCHAR(255),
-      company VARCHAR(255),
-      phone_number VARCHAR(20),
-      address VARCHAR(255),
-      city_province_postal VARCHAR(255),
-      is_verified BOOLEAN DEFAULT FALSE,
-      profile_picture_url TEXT,
-      company_description TEXT,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            name VARCHAR(255),
+            company VARCHAR(255),
+            phone_number VARCHAR(20),
+            address VARCHAR(255),
+            city_province_postal VARCHAR(255),
+            is_verified BOOLEAN DEFAULT FALSE,
+            profile_picture_url TEXT,
+            company_description TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            role VARCHAR(50) NOT NULL DEFAULT 'user',
+            last_login_at TIMESTAMPTZ,
+            company_logo_url TEXT,
+            plan_type VARCHAR(50) DEFAULT 'basic',
+            subscription_status VARCHAR(50) DEFAULT 'inactive',
+            subscription_start_date TIMESTAMPTZ,
+            free_automations_used INTEGER DEFAULT 0,
+            business_type VARCHAR(50) DEFAULT 'services',
+            is_onboarded BOOLEAN DEFAULT FALSE,
+            primary_goal VARCHAR(255),
+            weekly_pulse_enabled BOOLEAN DEFAULT TRUE,
+            team_id INTEGER,
+            invite_token VARCHAR(255) UNIQUE
+        )
+    `;
+
+    const waitlistTableQuery = `
+        CREATE TABLE IF NOT EXISTS waitlist (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const clientsTableQuery = `
-    CREATE TABLE IF NOT EXISTS clients (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) NOT NULL,
-      phone_number VARCHAR(20),
-      company_name VARCHAR(255),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT unique_client_email_per_user UNIQUE (user_id, email)
-    )
+        CREATE TABLE IF NOT EXISTS clients (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            phone_number VARCHAR(20),
+            company_name VARCHAR(255),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT unique_client_email_per_user UNIQUE (user_id, email)
+        )
     `;
 
     const salesDealsTableQuery = `
-    CREATE TABLE IF NOT EXISTS sales_deals (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-      name VARCHAR(255) NOT NULL,
-      value NUMERIC(12, 2) NOT NULL,
-      stage VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS sales_deals (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            value NUMERIC(12, 2) NOT NULL,
+            stage VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const dealNotesTableQuery = `
-    CREATE TABLE IF NOT EXISTS deal_notes (
-      id SERIAL PRIMARY KEY,
-      deal_id INTEGER NOT NULL REFERENCES sales_deals(id) ON DELETE CASCADE,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      note TEXT NOT NULL,
-      type VARCHAR(50),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS deal_notes (
+            id SERIAL PRIMARY KEY,
+            deal_id INTEGER NOT NULL REFERENCES sales_deals(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            note TEXT NOT NULL,
+            type VARCHAR(50),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const tasksTableQuery = `
-    CREATE TABLE IF NOT EXISTS tasks (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      title TEXT NOT NULL,
-      status VARCHAR(50) DEFAULT 'incomplete',
-      priority VARCHAR(50) DEFAULT 'Medium',
-      due_date TIMESTAMPTZ,
-      is_deleted BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS tasks (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            status VARCHAR(50) DEFAULT 'incomplete',
+            priority VARCHAR(50) DEFAULT 'Medium',
+            due_date TIMESTAMPTZ,
+            is_deleted BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            is_recurring BOOLEAN DEFAULT FALSE,
+            recurrence_interval VARCHAR(50)
+        )
     `;
 
     const transactionsTableQuery = `
-    CREATE TABLE IF NOT EXISTS transactions (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      title VARCHAR(255) NOT NULL,
-      amount NUMERIC(12, 2) NOT NULL,
-      type VARCHAR(50) NOT NULL,
-      category VARCHAR(100),
-      transaction_date TIMESTAMPTZ NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS transactions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            amount NUMERIC(12, 2) NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            category VARCHAR(100),
+            transaction_date TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            scope VARCHAR(50) DEFAULT 'business'
+        )
     `;
 
     const campaignsTableQuery = `
-    CREATE TABLE IF NOT EXISTS campaigns (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name VARCHAR(255) NOT NULL,
-      platform VARCHAR(100),
-      ad_spend NUMERIC(12, 2) DEFAULT 0,
-      reach INTEGER DEFAULT 0,
-      engagement INTEGER DEFAULT 0,
-      conversions INTEGER DEFAULT 0,
-      start_date TIMESTAMPTZ,
-      end_date TIMESTAMPTZ,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            platform VARCHAR(100),
+            ad_spend NUMERIC(12, 2) DEFAULT 0,
+            reach INTEGER DEFAULT 0,
+            engagement INTEGER DEFAULT 0,
+            conversions INTEGER DEFAULT 0,
+            start_date TIMESTAMPTZ,
+            end_date TIMESTAMPTZ,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const contentCalendarTableQuery = `
-    CREATE TABLE IF NOT EXISTS content_calendar (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      post_text TEXT,
-      platform VARCHAR(100),
-      status VARCHAR(50) DEFAULT 'draft',
-      post_date TIMESTAMPTZ,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS content_calendar (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            post_text TEXT,
+            platform VARCHAR(100),
+            status VARCHAR(50) DEFAULT 'draft',
+            post_date TIMESTAMPTZ,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const invoicesTableQuery = `
-    CREATE TABLE IF NOT EXISTS invoices (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-      invoice_number VARCHAR(100) NOT NULL,
-      issue_date TIMESTAMPTZ NOT NULL,
-      due_date TIMESTAMPTZ NOT NULL,
-      total_amount NUMERIC(12, 2) NOT NULL,
-      status VARCHAR(50) DEFAULT 'draft',
-      notes TEXT,
-      tax_rate NUMERIC(5, 2) DEFAULT 0.00,
-      tax_amount NUMERIC(12, 2) DEFAULT 0.00,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS invoices (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            invoice_number VARCHAR(100) NOT NULL,
+            issue_date TIMESTAMPTZ NOT NULL,
+            due_date TIMESTAMPTZ NOT NULL,
+            total_amount NUMERIC(12, 2) NOT NULL,
+            status VARCHAR(50) DEFAULT 'draft',
+            notes TEXT,
+            tax_rate NUMERIC(5, 2) DEFAULT 0.00,
+            tax_amount NUMERIC(12, 2) DEFAULT 0.00,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            last_reminder_sent_at TIMESTAMPTZ
+        )
     `;
 
     const invoiceLineItemsTableQuery = `
-    CREATE TABLE IF NOT EXISTS invoice_line_items (
-      id SERIAL PRIMARY KEY,
-      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-      description TEXT NOT NULL,
-      quantity NUMERIC(10, 2) NOT NULL,
-      unit_price NUMERIC(12, 2) NOT NULL,
-      total NUMERIC(12, 2) NOT NULL
-    )
+        CREATE TABLE IF NOT EXISTS invoice_line_items (
+            id SERIAL PRIMARY KEY,
+            invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            description TEXT NOT NULL,
+            quantity NUMERIC(10, 2) NOT NULL,
+            unit_price NUMERIC(12, 2) NOT NULL,
+            total NUMERIC(12, 2) NOT NULL
+        )
     `;
 
     const automationsTableQuery = `
-    CREATE TABLE IF NOT EXISTS automations (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name VARCHAR(255) NOT NULL,
-      trigger_type VARCHAR(100) NOT NULL,
-      is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS automations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            trigger_type VARCHAR(100) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const automationActionsTableQuery = `
-    CREATE TABLE IF NOT EXISTS automation_actions (
-      id SERIAL PRIMARY KEY,
-      automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
-      action_type VARCHAR(100) NOT NULL,
-      params JSONB
-    )
+        CREATE TABLE IF NOT EXISTS automation_actions (
+            id SERIAL PRIMARY KEY,
+            automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+            action_type VARCHAR(100) NOT NULL,
+            params JSONB
+        )
     `;
 
     const clientInteractionsTableQuery = `
-    CREATE TABLE IF NOT EXISTS client_interactions (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-        deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL,
-        type VARCHAR(50) NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS client_interactions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL,
+            type VARCHAR(50) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
-    // Break ALTER TABLE users into separate statements
-    const alterUsersQueries = [
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo_url TEXT`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free'`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'inactive'`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS free_automations_used INTEGER DEFAULT 0`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) DEFAULT 'services'`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS primary_goal VARCHAR(255)`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user'`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_pulse_enabled BOOLEAN DEFAULT TRUE`,
-        `ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`
-    ];
-
-    const alterInvoicesQuery = `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ`;
-
-    // Break ALTER TABLE tasks into separate statements
-    const alterTasksQueries = [
-        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE`,
-        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_interval VARCHAR(50)`
-    ];
-
     const intakeFormsTableQuery = `
-    CREATE TABLE IF NOT EXISTS intake_forms (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        questions JSONB NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id)
-    )
+        CREATE TABLE IF NOT EXISTS intake_forms (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            questions JSONB NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id)
+        )
     `;
 
     const formSubmissionsTableQuery = `
-    CREATE TABLE IF NOT EXISTS form_submissions (
-        id SERIAL PRIMARY KEY,
-        form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE,
-        responses JSONB NOT NULL,
-        client_name VARCHAR(255),
-        client_email VARCHAR(255),
-        submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS form_submissions (
+            id SERIAL PRIMARY KEY,
+            form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE,
+            responses JSONB NOT NULL,
+            client_name VARCHAR(255),
+            client_email VARCHAR(255),
+            submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const userGoalsTableQuery = `
-    CREATE TABLE IF NOT EXISTS user_goals (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-        revenue_goal NUMERIC(12, 2) DEFAULT 0,
-        new_clients_goal INTEGER DEFAULT 0,
-        deals_won_goal INTEGER DEFAULT 0,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS user_goals (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            revenue_goal NUMERIC(12, 2) DEFAULT 0,
+            new_clients_goal INTEGER DEFAULT 0,
+            deals_won_goal INTEGER DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
     `;
 
     const alterTransactionsQuery = `
-    ALTER TABLE transactions
-    ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'
+        ALTER TABLE transactions
+        ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'
+    `;
+
+    const addTeamIdToUsersQuery = `
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    `;
+
+    const addInviteTokenToUsersQuery = `
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE;
     `;
 
     const adminEmail = 'damilolasoaga@gmail.com';
     const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'ChangeThisPassword123!';
     const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
     const adminUserQuery = `
-        INSERT INTO users (name, email, password, role, is_verified) 
-        VALUES ('Admin', $1, $2, 'admin', TRUE) 
+        INSERT INTO users (name, email, password, role, is_verified)
+        VALUES ('Admin', $1, $2, 'admin', TRUE)
         ON CONFLICT (email) DO UPDATE SET role = 'admin', password = $2;
     `;
 
     try {
-        // Base tables
         await pool.query(userTableQuery);
+        await pool.query(waitlistTableQuery);
         await pool.query(clientsTableQuery);
         await pool.query(salesDealsTableQuery);
         await pool.query(dealNotesTableQuery);
@@ -469,27 +507,14 @@ const initializeDatabase = async () => {
         await pool.query(automationsTableQuery);
         await pool.query(automationActionsTableQuery);
         await pool.query(clientInteractionsTableQuery);
-
-        // Schema updates
-        for (const query of alterUsersQueries) {
-            await pool.query(query);
-        }
-
-        await pool.query(alterInvoicesQuery);
-
-        for (const query of alterTasksQueries) {
-            await pool.query(query);
-        }
-
         await pool.query(intakeFormsTableQuery);
         await pool.query(formSubmissionsTableQuery);
         await pool.query(userGoalsTableQuery);
         await pool.query(alterTransactionsQuery);
-
-        // Ensure Admin user exists with the correct role
+        await pool.query(addTeamIdToUsersQuery);
+        await pool.query(addInviteTokenToUsersQuery);
         await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
         console.log(`Admin user for ${adminEmail} ensured with 'admin' role.`);
-
         console.log('All tables created or already exist.');
         console.log('Schema updates successful.');
     } catch (err) {
@@ -498,143 +523,103 @@ const initializeDatabase = async () => {
     }
 };
 
-
 // =========================================================================
 // EMAIL & AI SERVICE CONFIGURATION
 // =========================================================================
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2024-06-20", // lock to latest stable
+    apiVersion: "2024-06-20",
 });
 
+// // =========================================================================
+// // WAITLIST ROUTES (NEW)
+// // =========================================================================
+// app.post('/api/waitlist', async (req, res) => {
+//     const { name, email } = req.body;
+//     if (!name || !email) {
+//         return res.status(400).json({ message: 'Name and email are required.' });
+//     }
+//     try {
+//         await pool.query('INSERT INTO waitlist (name, email) VALUES ($1, $2)', [name, email]);
+//         res.status(201).json({ message: 'You have been added to the waitlist! We will notify you when we launch.' });
+//     } catch (err) {
+//         if (err.code === '23505') { // Unique constraint violation
+//             return res.status(409).json({ message: 'This email is already on the waitlist.' });
+//         }
+//         console.error('Error adding to waitlist:', err);
+//         res.status(500).json({ message: 'Server error while joining waitlist.' });
+//     }
+// });
+
+// app.get('/api/waitlist/status', (req, res) => {
+//     const now = new Date();
+//     if (now < LAUNCH_DATE) {
+//         return res.status(200).json({ status: 'waitlist', launchDate: LAUNCH_DATE.toISOString() });
+//     }
+//     res.status(200).json({ status: 'live' });
+// });
+
 
 // =========================================================================
-// MIDDLEWARE
-// =========================================================================
-const authenticateToken = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // Fetch user role from DB and attach to request object
-        const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.userId]);
-        if (userRes.rows.length === 0) return res.sendStatus(403);
-        
-        req.user = { ...decoded, role: userRes.rows[0].role };
-        next();
-    // eslint-disable-next-line no-unused-vars
-    } catch (err) {
-        return res.sendStatus(403);
-    }
-};
-
-// Add this new middleware to server/server.js
-const requireAdmin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
-        next();
-    } else {
-        res.status(403).json({ message: 'Forbidden: Admin access required.' });
-    }
-};
-
-// NEW: "Gatekeeper" middleware to check user's subscription and plan
-const checkSubscription = (allowedPlans) => {
-    return async (req, res, next) => {
-        const { userId } = req.user;
-        try {
-            const userRes = await pool.query('SELECT plan_type, subscription_status, trial_ends_at FROM users WHERE id = $1', [userId]);
-            if (userRes.rows.length === 0) {
-                return res.status(404).json({ message: "User not found." });
-            }
-            const user = userRes.rows[0];
-            const isTrialing = user.subscription_status === 'trialing' && new Date(user.trial_ends_at) > new Date();
-            const isActiveSub = user.subscription_status === 'active';
-            const isBeta = user.subscription_status === 'beta';
-
-            if (isTrialing || isActiveSub || isBeta) {
-                if (allowedPlans.includes(user.plan_type) || isBeta) {
-                    req.user.plan = user; // Attach plan info to the request
-                    return next();
-                } else {
-                    return res.status(403).json({ message: `Upgrade to a ${allowedPlans.join(' or ')} plan to access this feature.` });
-                }
-            } else {
-                return res.status(403).json({ message: "Your trial has expired or your subscription is inactive. Please upgrade to continue." });
-            }
-        } catch (error) {
-            console.error("Subscription check error:", error);
-            return res.status(500).json({ message: "Server error during subscription check." });
-        }
-    };
-};
-
-// =========================================================================
-// SETTINGS API ROUTE (NEW)
+// SETTINGS API ROUTE
 // =========================================================================
 app.put('/api/settings', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    const { weeklyPulseEnabled } = req.body;
-
-    try {
-        const result = await pool.query(
-            'UPDATE users SET weekly_pulse_enabled = $1 WHERE id = $2 RETURNING id, weekly_pulse_enabled AS "weeklyPulseEnabled"',
-            [weeklyPulseEnabled, userId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error updating settings:', err);
-        res.status(500).json({ message: 'Server error while updating settings.' });
-    }
+    const { userId } = req.user;
+    const { weeklyPulseEnabled } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE users SET weekly_pulse_enabled = $1 WHERE id = $2 RETURNING id, weekly_pulse_enabled AS "weeklyPulseEnabled"',
+            [weeklyPulseEnabled, userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating settings:', err);
+        res.status(500).json({ message: 'Server error while updating settings.' });
+    }
 });
+
 
 // =========================================================================
 // AUTHENTICATION ROUTES
 // =========================================================================
 app.post('/api/signup', async (req, res) => {
     const { email, password, name, company, phoneNumber, companyDescription } = req.body;
-    if (!email || !password || !name) {
-        return res.status(400).json({ message: 'Email, password, and name are required.' });
+    
+    if (!email || !password || !name || !company || !companyDescription) {
+        return res.status(400).json({ message: 'Email, password, name, company, and business description are required.' });
+    }
+    if (!strongPasswordRegex.test(password)) {
+        return res.status(400).json({ message: 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.' });
     }
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-
         const existingUser = await client.query('SELECT * FROM users WHERE email = $1', [email]);
         if (existingUser.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(409).json({ message: 'An account with this email already exists.' });
         }
-
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUserResult = await client.query(
-            'INSERT INTO users (email, password, name, company, phone_number, company_description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-            [email, hashedPassword, name, company, phoneNumber, companyDescription]
+            'INSERT INTO users (email, password, name, company, phone_number, company_description, plan_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+            [email, hashedPassword, name, company, phoneNumber, companyDescription, 'basic']
         );
         const userId = newUserResult.rows[0].id;
-
-        await client.query(
-            `UPDATE users SET subscription_status = 'trialing', trial_ends_at = NOW() + INTERVAL '14 days', plan_type = 'solo' WHERE id = $1`,
-            [userId]
-        );
-
         const verificationToken = jwt.sign({ userId: userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        // CORRECTED: The link now points to your live backend server
         const verificationUrl = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
-
-         const msg = {
+        const msg = {
             to: email,
             from: 'noreply@entruvi.com',
             subject: 'Welcome to Entruvi! Please Verify Your Email',
             html: `
 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
     <h2 style="text-align: center;">Welcome to Entruvi!</h2>
-    <p>Thanks for signing up. Please click the button below to verify your email address and start your trial.</p>
+    <p>Thanks for signing up. Please click the button below to verify your email address and complete your setup.</p>
     <div style="text-align: center; margin: 30px 0;">
         <a href="${verificationUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Verify My Email</a>
     </div>
@@ -642,15 +627,12 @@ app.post('/api/signup', async (req, res) => {
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
     <div style="text-align: center; font-size: 12px; color: #6C757D;">
         <p>&copy; ${new Date().getFullYear()} Entruvi. All rights reserved.</p>
-        <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
     </div>
 </div>`,
         };
         await sgMail.send(msg);
-
         await client.query('COMMIT');
         res.status(201).json({ message: 'Account created! Please check your email to verify your account and complete setup.' });
-
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Error during signup:', err);
@@ -659,26 +641,6 @@ app.post('/api/signup', async (req, res) => {
         client.release();
     }
 });
-
-// Add this new route to server/server.js, after the signup route
-
-app.get('/api/verify-email', async (req, res) => {
-    const { token } = req.query;
-    if (!token) {
-        return res.status(400).send('Verification token is missing.');
-    }
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const { userId } = decoded;
-        await pool.query('UPDATE users SET is_verified = TRUE WHERE id = $1', [userId]);
-        // Redirect user to the login page with a success message
-        res.redirect(`${process.env.FRONTEND_URL}?verified=true`);
-    } catch (error) {
-        console.error("Email verification error:", error);
-        res.status(400).send('Invalid or expired verification link.');
-    }
-});
-
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -686,13 +648,9 @@ app.post('/api/login', async (req, res) => {
         const user = result.rows[0];
         if (!user) return res.status(400).json({ message: 'Invalid credentials.' });
         if (!user.is_verified) return res.status(401).json({ message: 'Please verify your email to log in.' });
-        
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials.' });
-        
-        // NEW: Update last_login_at timestamp
         await pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
-
         const token = jwt.sign({ userId: user.id, email: user.email, name: user.name }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.status(200).json({ message: 'Login successful!', token });
     } catch (err) {
@@ -701,227 +659,227 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Add this new route for users to request a password reset
+app.get('/api/verify-email', async (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.status(400).send('Verification token is missing.');
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { userId } = decoded;
+        await pool.query('UPDATE users SET is_verified = TRUE WHERE id = $1', [userId]);
+        res.redirect(`${process.env.FRONTEND_URL}/auth?verified=true`);
+    } catch (error) {
+        console.error("Email verification error:", error);
+        res.status(400).send('Invalid or expired verification link.');
+    }
+});
+
 app.post('/api/forgot-password', async (req, res) => {
-    const { email } = req.body;
-    try {
-        const userRes = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
-        if (userRes.rows.length === 0) {
-            // To prevent attackers from checking which emails are registered, we send a success message even if the user doesn't exist.
-            return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
-        }
-        
-        const user = userRes.rows[0];
-        const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-        
-        const msg = {
-            to: email,
-            from: 'noreply@entruvi.com',
-            subject: 'Password Reset Request for Your Entruvi Account',
-            html: `
+    const { email } = req.body;
+    try {
+        const userRes = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
+        if (userRes.rows.length === 0) {
+            return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+        }
+        const user = userRes.rows[0];
+        const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+        const msg = {
+            to: email,
+            from: 'noreply@entruvi.com',
+            subject: 'Password Reset Request for Your Entruvi Account',
+            html: `
 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
-    <h2 style="text-align: center;">Password Reset Request</h2>
-    <p>We received a request to reset the password for your account. Please click the button below to set a new password. This link is valid for one hour.</p>
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Reset Your Password</a>
-    </div>
-    <p>If you did not request a password reset, you can safely ignore this email.</p>
-    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
-    <div style="text-align: center; font-size: 12px; color: #6C757D;">
-        <p>&copy; ${new Date().getFullYear()} Entruvi. All rights reserved.</p>
-        <p><a href="#" style="color: #6C757D;">Terms of Service</a> | <a href="#" style="color: #6C757D;">Privacy Policy</a></p>
-    </div>
+    <h2 style="text-align: center;">Password Reset Request</h2>
+    <p>We received a request to reset the password for your account. Please click the button below to set a new password. This link is valid for one hour.</p>
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetUrl}" style="background-color: #5b8cff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Reset Your Password</a>
+    </div>
+    <p>If you did not request a password reset, you can safely ignore this email.</p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;"/>
+    <div style="text-align: center; font-size: 12px; color: #6C757D;">
+        <p>&copy; ${new Date().getFullYear()} Entruvi. All rights reserved.</p>
+    </div>
 </div>`,
-        };
-        await sgMail.send(msg);
-
-        res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
-    } catch (err) {
-        console.error('Error in forgot password:', err);
-        res.status(500).json({ message: 'Server error.' });
-    }
+        };
+        await sgMail.send(msg);
+        res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+    } catch (err) {
+        console.error('Error in forgot password:', err);
+        res.status(500).json({ message: 'Server error.' });
+    }
 });
 
-// Add this new route for users to submit their new password
+// New password reset confirmation email ---
 app.post('/api/reset-password', async (req, res) => {
-    const { token, password } = req.body;
-    if (!token || !password) {
-        return res.status(400).json({ message: 'Token and new password are required.' });
-    }
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const { userId } = decoded;
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
-        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
-    } catch (error) {
-        console.error("Password reset error:", error);
-        res.status(400).json({ message: 'Invalid or expired password reset link.' });
-    }
+    const { token, password } = req.body;
+    if (!token || !password) {
+        return res.status(400).json({ message: 'Token and new password are required.' });
+    }
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { userId } = decoded;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+        
+        const userRes = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length > 0) {
+            const userEmail = userRes.rows[0].email;
+            const userName = userRes.rows[0].name || 'User';
+            const msg = {
+                to: userEmail,
+                from: 'noreply@entruvi.com',
+                subject: 'Your Entruvi password has been reset',
+                html: `<p>Hello ${userName},</p><p>This is a confirmation that the password for your Entruvi account has been successfully updated. If you did not make this change, please contact support immediately.</p><p>Thank you,<br/>The Entruvi Team</p>`,
+            };
+            await sgMail.send(msg);
+        }
+
+        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
+    } catch (error) {
+        console.error("Password reset error:", error);
+        res.status(400).json({ message: 'Invalid or expired password reset link.' });
+    }
 });
 
-
-// ➡️ NEW: GET endpoint to fetch the full user profile.
-// ➡️ GET endpoint to fetch the full user profile
 app.get('/api/profile', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const query = `
-            SELECT 
-                id, 
-                name, 
-                email, 
-                company, 
-                phone_number AS "phoneNumber", 
-                profile_picture_url AS "profilePictureUrl", 
-                company_description AS "companyDescription",
-                company_logo_url AS "companyLogoUrl",
-                address,
-                city_province_postal AS "cityProvincePostal",
-                plan_type AS "planType",
-                subscription_status AS "subscriptionStatus",
-                trial_ends_at AS "trialEndsAt",
-                role,
-                weekly_pulse_enabled AS "weeklyPulseEnabled"
-            FROM users 
-            WHERE id = $1;
-        `;
-        console.log("Running query [profile]:", query, "with userId:", userId);
-
-        const result = await pool.query(query, [userId]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error fetching profile:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const query = `
+            SELECT
+                id,
+                name,
+                email,
+                company,
+                phone_number AS "phoneNumber",
+                profile_picture_url AS "profilePictureUrl",
+                company_description AS "companyDescription",
+                company_logo_url AS "companyLogoUrl",
+                address,
+                city_province_postal AS "cityProvincePostal",
+                plan_type AS "planType",
+                subscription_status AS "subscriptionStatus",
+                subscription_start_date AS "subscriptionStartDate",
+                role,
+                weekly_pulse_enabled AS "weeklyPulseEnabled"
+            FROM users
+            WHERE id = $1;
+        `;
+        const result = await pool.query(query, [userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching profile:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-// UPDATED: PUT /api/profile also returns consistent camelCase keys
 app.put('/api/profile', authenticateToken, async (req, res) => {
-    const { name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal } = req.body;
-    const { userId } = req.user;
-
-    try {
-        const result = await pool.query(
-            `UPDATE users SET 
-                name = $1, company = $2, phone_number = $3, profile_picture_url = $4, 
-                company_description = $5, company_logo_url = $6, address = $7, city_province_postal = $8
-             WHERE id = $9 RETURNING *`,
-            [name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal, userId]
-        );
-        const updatedUser = result.rows[0];
-        
-        const newToken = jwt.sign(
-            { userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Construct the user object with camelCase keys to ensure consistency
-        const userPayload = {
-            id: updatedUser.id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            company: updatedUser.company,
-            phoneNumber: updatedUser.phone_number,
-            profilePictureUrl: updatedUser.profile_picture_url,
-            companyDescription: updatedUser.company_description,
-            companyLogoUrl: updatedUser.company_logo_url,
-            address: updatedUser.address,
-            cityProvincePostal: updatedUser.city_province_postal,
-            planType: updatedUser.plan_type,
-            subscriptionStatus: updatedUser.subscription_status,
-            trialEndsAt: updatedUser.trial_ends_at
-        };
-
-        res.status(200).json({ 
-            message: 'Profile updated successfully.', 
-            token: newToken,
-            user: userPayload 
-        });
-    } catch (err) {
-        console.error('Error updating profile:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal } = req.body;
+    const { userId } = req.user;
+    try {
+        const result = await pool.query(
+            `UPDATE users SET
+                name = $1, company = $2, phone_number = $3, profile_picture_url = $4,
+                company_description = $5, company_logo_url = $6, address = $7, city_province_postal = $8
+             WHERE id = $9 RETURNING *`,
+            [name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal, userId]
+        );
+        const updatedUser = result.rows[0];
+        const newToken = jwt.sign(
+            { userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        const userPayload = {
+            id: updatedUser.id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            company: updatedUser.company,
+            phoneNumber: updatedUser.phone_number,
+            profilePictureUrl: updatedUser.profile_picture_url,
+            companyDescription: updatedUser.company_description,
+            companyLogoUrl: updatedUser.company_logo_url,
+            address: updatedUser.address,
+            cityProvincePostal: updatedUser.city_province_postal,
+            planType: updatedUser.plan_type,
+            subscriptionStatus: updatedUser.subscription_status,
+            subscriptionStartDate: updatedUser.subscription_start_date
+        };
+        res.status(200).json({
+            message: 'Profile updated successfully.',
+            token: newToken,
+            user: userPayload
+        });
+    } catch (err) {
+        console.error('Error updating profile:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-// NEW: Endpoint to handle the submission of the first-time onboarding form
 app.put('/api/profile/onboarding', authenticateToken, async (req, res) => {
-    const { businessType, company, companyLogoUrl, primaryGoal } = req.body;
-    const { userId } = req.user;
-
-    try {
-        await pool.query(
-            `UPDATE users SET 
-                business_type = $1, 
-                company = $2, 
-                company_logo_url = $3, 
-                primary_goal = $4,
-                is_onboarded = TRUE 
-             WHERE id = $5`,
-            [businessType, company, companyLogoUrl, primaryGoal, userId]
-        );
-
-        // Fetch the full, updated user profile to send back
-        const updatedUserRes = await pool.query(
-            `SELECT 
-                id, name, email, company, phone_number AS "phoneNumber", 
-                profile_picture_url AS "profilePictureUrl", company_description AS "companyDescription",
-                company_logo_url AS "companyLogoUrl", address, city_province_postal AS "cityProvincePostal",
-                plan_type AS "planType", subscription_status AS "subscriptionStatus", 
-                trial_ends_at AS "trialEndsAt", is_onboarded AS "isOnboarded"
-            FROM users WHERE id = $1`,
-            [userId]
-        );
-        
-        res.status(200).json({ message: 'Onboarding complete!', user: updatedUserRes.rows[0] });
-
-    } catch (err) {
-        console.error('Error saving onboarding data:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { businessType, company, companyLogoUrl, primaryGoal } = req.body;
+    const { userId } = req.user;
+    try {
+        await pool.query(
+            `UPDATE users SET
+                business_type = $1,
+                company = $2,
+                company_logo_url = $3,
+                primary_goal = $4,
+                is_onboarded = TRUE
+             WHERE id = $5`,
+            [businessType, company, companyLogoUrl, primaryGoal, userId]
+        );
+        const updatedUserRes = await pool.query(
+            `SELECT
+                id, name, email, company, phone_number AS "phoneNumber",
+                profile_picture_url AS "profilePictureUrl", company_description AS "companyDescription",
+                company_logo_url AS "companyLogoUrl", address, city_province_postal AS "cityProvincePostal",
+                plan_type AS "planType", subscription_status AS "subscriptionStatus",
+                is_onboarded AS "isOnboarded"
+            FROM users WHERE id = $1`,
+            [userId]
+        );
+        res.status(200).json({ message: 'Onboarding complete!', user: updatedUserRes.rows[0] });
+    } catch (err) {
+        console.error('Error saving onboarding data:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
-
-
-// GOALS API ROUTES (NEW)
-// =========================================================================
 
 app.get('/api/goals', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        let goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
-        // If no goals exist for the user, create a default entry
-        if (goalsRes.rows.length === 0) {
-            await pool.query('INSERT INTO user_goals (user_id) VALUES ($1)', [userId]);
-            goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
-        }
-        res.status(200).json(goalsRes.rows[0]);
-    } catch (err) {
-        console.error('Error fetching goals:', err);
-        res.status(500).json({ message: 'Server error while fetching goals.' });
-    }
+    const { userId } = req.user;
+    try {
+        let goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
+        if (goalsRes.rows.length === 0) {
+            await pool.query('INSERT INTO user_goals (user_id) VALUES ($1)', [userId]);
+            goalsRes = await pool.query('SELECT * FROM user_goals WHERE user_id = $1', [userId]);
+        }
+        res.status(200).json(goalsRes.rows[0]);
+    } catch (err) {
+        console.error('Error fetching goals:', err);
+        res.status(500).json({ message: 'Server error while fetching goals.' });
+    }
 });
 
 app.put('/api/goals', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    const { revenue_goal, new_clients_goal, deals_won_goal } = req.body;
-    try {
-        const updatedGoalsRes = await pool.query(
-            `UPDATE user_goals 
-             SET revenue_goal = $1, new_clients_goal = $2, deals_won_goal = $3, updated_at = NOW() 
-             WHERE user_id = $4 
-             RETURNING *`,
-            [revenue_goal, new_clients_goal, deals_won_goal, userId]
-        );
-        res.status(200).json(updatedGoalsRes.rows[0]);
-    } catch (err) {
-        console.error('Error updating goals:', err);
-        res.status(500).json({ message: 'Server error while updating goals.' });
-    }
+    const { userId } = req.user;
+    const { revenue_goal, new_clients_goal, deals_won_goal } = req.body;
+    try {
+        const updatedGoalsRes = await pool.query(
+            `UPDATE user_goals
+             SET revenue_goal = $1, new_clients_goal = $2, deals_won_goal = $3, updated_at = NOW()
+             WHERE user_id = $4
+             RETURNING *`,
+            [revenue_goal, new_clients_goal, deals_won_goal, userId]
+        );
+        res.status(200).json(updatedGoalsRes.rows[0]);
+    } catch (err) {
+        console.error('Error updating goals:', err);
+        res.status(500).json({ message: 'Server error while updating goals.' });
+    }
 });
 
 
@@ -1087,14 +1045,97 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     }
 });
 
+// --- Team Management API Routes ---
+app.post('/api/team/invite', authenticateToken, checkSubscription(['team']), async (req, res) => {
+    const { email, name } = req.body;
+    const { user } = req;
+    if (user.plan_type !== 'team') {
+        return res.status(403).json({ message: 'Only team owners can invite users.' });
+    }
+    try {
+        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (existingUser.rows.length > 0) {
+            if (existingUser.rows[0].team_id) {
+                return res.status(409).json({ message: 'This user is already a member of a team.' });
+            }
+            const inviteToken = jwt.sign({ userId: existingUser.rows[0].id, teamId: user.team_id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+            await pool.query('UPDATE users SET invite_token = $1 WHERE id = $2', [inviteToken, existingUser.rows[0].id]);
+            const inviteUrl = `${process.env.FRONTEND_URL}/team/join?token=${inviteToken}`;
+            const msg = {
+                to: email,
+                from: 'noreply@entruvi.com',
+                subject: `You've been invited to join the team on Entruvi!`,
+                html: `<p>Hello ${name},</p><p>You have been invited to join ${user.company || user.name}'s team on Entruvi. Click the link below to accept the invitation and start collaborating!</p><a href="${inviteUrl}">Join the Team</a>`,
+            };
+            await sgMail.send(msg);
+            return res.status(200).json({ message: 'Invitation sent to existing user.' });
+        }
+        const inviteToken = jwt.sign({ teamId: user.team_id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        await pool.query('INSERT INTO users (email, name, invite_token) VALUES ($1, $2, $3)', [email, name, inviteToken]);
+        const inviteUrl = `${process.env.FRONTEND_URL}/auth?invite=${inviteToken}`;
+        const msg = {
+            to: email,
+            from: 'noreply@entruvi.com',
+            subject: `You've been invited to join the team on Entruvi!`,
+            html: `<p>Hello ${name},</p><p>You have been invited to join ${user.company || user.name}'s team on Entruvi. Click the link below to sign up and start collaborating!</p><a href="${inviteUrl}">Sign Up and Join the Team</a>`,
+        };
+        await sgMail.send(msg);
+        res.status(200).json({ message: 'Invitation sent to new user.' });
+    } catch (err) {
+        console.error('Error inviting user:', err);
+        res.status(500).json({ message: 'Server error while inviting user.' });
+    }
+});
+
+app.post('/api/team/join', authenticateToken, async (req, res) => {
+    const { token } = req.body;
+    const { userId } = req.user;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.userId !== userId) {
+            return res.status(403).json({ message: 'Invalid invitation for this user.' });
+        }
+        const teamRes = await pool.query('SELECT team_id FROM users WHERE id = $1', [userId]);
+        if (teamRes.rows[0].team_id) {
+            return res.status(409).json({ message: 'You are already a member of a team.' });
+        }
+        await pool.query('UPDATE users SET team_id = $1, invite_token = NULL WHERE id = $2', [decoded.teamId, userId]);
+        res.status(200).json({ message: 'Successfully joined the team!' });
+    } catch (err) {
+        console.error('Error joining team:', err);
+        res.status(400).json({ message: 'Invalid or expired invitation token.' });
+    }
+});
+
+app.get('/api/team/members', authenticateToken, checkSubscription(['team']), async (req, res) => {
+    const { team_id } = req.user;
+    try {
+        const members = await pool.query('SELECT id, name, email FROM users WHERE team_id = $1', [team_id]);
+        res.status(200).json(members.rows);
+    } catch (err) {
+        console.error('Error fetching team members:', err);
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
+app.post('/api/team/kick', authenticateToken, checkSubscription(['team']), async (req, res) => {
+    const { memberId } = req.body;
+    const { userId, team_id } = req.user;
+    try {
+        if (userId === memberId) {
+            return res.status(400).json({ message: 'You cannot kick yourself.' });
+        }
+        await pool.query('UPDATE users SET team_id = NULL WHERE id = $1 AND team_id = $2', [memberId, team_id]);
+        res.status(200).json({ message: 'User removed from team.' });
+    } catch (err) {
+        console.error('Error kicking user:', err);
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
 
 // =========================================================================
 // SALES & CLIENTS API ROUTES
 // =========================================================================
-
-// POST a new client for the logged-in user
-// Replace in server/server.js
-
 app.post('/api/sales/clients', authenticateToken, async (req, res) => {
     const { name, email, phoneNumber, companyName } = req.body;
     const { userId } = req.user;
@@ -1123,10 +1164,10 @@ app.post('/api/sales/clients', authenticateToken, async (req, res) => {
 });
 
 // GET all clients for the logged-in user
-app.get('/api/sales/clients', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/sales/clients', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
-        const clients = await pool.query('SELECT * FROM clients WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+        const clients = await pool.query('SELECT * FROM clients WHERE user_id = ANY($1) ORDER BY created_at DESC', [dataScopeIds]);
         res.status(200).json(clients.rows);
     } catch (err) {
         console.error('Error fetching clients:', err);
@@ -1156,11 +1197,11 @@ app.get('/api/sales/clients/check', authenticateToken, async (req, res) => {
 });
 
 // GET a specific client by ID for the logged-in user.
-app.get('/api/sales/clients/:clientId', authenticateToken, async (req, res) => {
+app.get('/api/sales/clients/:clientId', authenticateToken, teamDataMiddleware, async (req, res) => {
     const { clientId } = req.params;
-    const { userId } = req.user;
+    const { dataScopeIds } = req.user;
     try {
-        const client = await pool.query('SELECT * FROM clients WHERE id = $1 AND user_id = $2', [clientId, userId]);
+        const client = await pool.query('SELECT * FROM clients WHERE id = $1 AND user_id = ANY($2)', [clientId, dataScopeIds]);
         if (client.rows.length === 0) {
             return res.status(404).json({ message: 'Client not found or user not authorized.' });
         }
@@ -1172,16 +1213,15 @@ app.get('/api/sales/clients/:clientId', authenticateToken, async (req, res) => {
 });
 
 // Get or Create an Intake Form
-app.get('/api/sales/intake-form', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/sales/intake-form', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
-        let form = await pool.query('SELECT * FROM intake_forms WHERE user_id = $1', [userId]);
+        let form = await pool.query('SELECT * FROM intake_forms WHERE user_id = ANY($1)', [dataScopeIds]);
         if (form.rows.length === 0) {
-            // Create a default form if one doesn't exist
             const defaultQuestions = [{ text: 'What are your primary goals for this project?' }];
             const newForm = await pool.query(
                 'INSERT INTO intake_forms (user_id, questions) VALUES ($1, $2) RETURNING *',
-                [userId, JSON.stringify(defaultQuestions)]
+                [dataScopeIds[0], JSON.stringify(defaultQuestions)]
             );
             return res.status(200).json(newForm.rows[0]);
         }
@@ -1208,35 +1248,28 @@ app.put('/api/sales/intake-form', authenticateToken, async (req, res) => {
     }
 });
 
-
-// NEW: Endpoint specifically for the CRM to get a list of all clients
 // ➡️ Endpoint for CRM to get all clients
-app.get('/api/crm/clients', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/crm/clients', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
         const query = `
-            SELECT 
-                c.id, 
-                c.name, 
-                c.email, 
-                c.company_name AS "companyName",
-                COUNT(sd.id) AS deal_count,
-                COALESCE(SUM(CASE WHEN sd.stage = 'Closed Won' THEN sd.value ELSE 0 END), 0) AS total_value
+            SELECT c.id, c.name, c.email, c.company_name AS "companyName",
+                   COUNT(sd.id) AS deal_count,
+                   COALESCE(SUM(CASE WHEN sd.stage = 'Closed Won' THEN sd.value ELSE 0 END), 0) AS total_value
             FROM clients c
             LEFT JOIN sales_deals sd ON c.id = sd.client_id
-            WHERE c.user_id = $1
+            WHERE c.user_id = ANY($1)
             GROUP BY c.id
             ORDER BY c.name ASC;
         `;
-        console.log("Running query [crm/clients]:", query, "with userId:", userId);
-
-        const clients = await pool.query(query, [userId]);
+        const clients = await pool.query(query, [dataScopeIds]);
         res.status(200).json(clients.rows);
     } catch (err) {
         console.error('Error fetching CRM client list:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 // NEW: Endpoint to get all details for a single client
 app.get('/api/crm/clients/:id', authenticateToken, async (req, res) => {
@@ -1295,20 +1328,16 @@ app.get('/api/crm/clients/:id', authenticateToken, async (req, res) => {
 });
 
 // GET all sales deals for the logged-in user, now with client info.
-app.get('/api/sales/deals', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/sales/deals', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
         const deals = await pool.query(`
-            SELECT 
-                sd.*, 
-                c.name AS client_name, 
-                c.email AS client_email, 
-                c.company_name AS client_company 
+            SELECT sd.*, c.name AS client_name, c.email AS client_email, c.company_name AS client_company
             FROM sales_deals sd
             JOIN clients c ON sd.client_id = c.id
-            WHERE sd.user_id = $1
+            WHERE sd.user_id = ANY($1)
             ORDER BY sd.created_at DESC
-        `, [userId]);
+        `, [dataScopeIds]);
         res.status(200).json(deals.rows);
     } catch (err) {
         console.error('Error fetching sales data:', err);
@@ -1345,53 +1374,42 @@ app.post('/api/sales/deals', authenticateToken, async (req, res) => {
 });
 
 
-app.put('/api/sales/deals/:dealId', authenticateToken, async (req, res) => {
+app.put('/api/sales/deals/:dealId', authenticateToken, teamDataMiddleware, async (req, res) => {
     const { dealId } = req.params;
     const { name, value, stage, client_id } = req.body;
-    const { userId } = req.user;
+    const { userId, dataScopeIds } = req.user;
     const client = await pool.connect();
-
     try {
         await client.query('BEGIN');
-
-        const userRes = await client.query('SELECT plan_type, free_automations_used, subscription_status, trial_ends_at FROM users WHERE id = $1', [userId]);
+        const userRes = await client.query('SELECT plan_type, free_automations_used, subscription_status, subscription_start_date FROM users WHERE id = $1', [userId]);
         const userPlan = userRes.rows[0];
-        const isTrialActive = userPlan.subscription_status === 'trialing' && new Date(userPlan.trial_ends_at) > new Date();
         const hasActiveSub = userPlan.subscription_status === 'active';
-        
-        const originalDealRes = await client.query('SELECT stage FROM sales_deals WHERE id = $1 AND user_id = $2', [dealId, userId]);
+        const originalDealRes = await client.query('SELECT stage FROM sales_deals WHERE id = $1 AND user_id = ANY($2)', [dealId, dataScopeIds]);
         if (originalDealRes.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Deal not found.' });
         }
         const originalStage = originalDealRes.rows[0].stage;
-
         const updatedDealResult = await client.query(
-            'UPDATE sales_deals SET name = $1, value = $2, stage = $3, updated_at = CURRENT_TIMESTAMP, client_id = $4 WHERE id = $5 AND user_id = $6 RETURNING id',
-            [name, value, stage, client_id, dealId, userId]
+            'UPDATE sales_deals SET name = $1, value = $2, stage = $3, updated_at = CURRENT_TIMESTAMP, client_id = $4 WHERE id = $5 AND user_id = ANY($6) RETURNING id',
+            [name, value, stage, client_id, dealId, dataScopeIds]
         );
-        
         const updatedDealId = updatedDealResult.rows[0].id;
         let next_actions = [];
         let automation_result = null;
-
-             if (stage === 'Closed Won' && originalStage !== 'Closed Won') {
-            // Check if the user is eligible for automations
-            if (hasActiveSub || isTrialActive) {
-                // Check if it's the "one free taste" for free plan users
-                if (userPlan.plan_type === 'free' && userPlan.free_automations_used < 1) {
+        if (stage === 'Closed Won' && originalStage !== 'Closed Won') {
+            if (hasActiveSub) {
+                if (userPlan.plan_type === 'basic' && userPlan.free_automations_used < 1) {
                     await client.query('UPDATE users SET free_automations_used = free_automations_used + 1 WHERE id = $1', [userId]);
                     await client.query('INSERT INTO tasks (user_id, title, priority) VALUES ($1, $2, $3)', [userId, `Onboard new client: ${name}`, 'High']);
                     automation_result = { status: 'success_one_time_freebie', message: `We've created an onboarding task for ${name} automatically this time!` };
-                } else if (userPlan.plan_type === 'free') {
-                    // They've used their freebie, show the teaser
+                } else if (userPlan.plan_type === 'basic') {
                     automation_result = { status: 'teaser', message: 'Upgrade to automate this.' };
                     next_actions = [
                         { type: 'create_onboarding_task', label: 'Create Onboarding Task' },
                         { type: 'send_welcome_email', label: 'Draft Welcome Email' }
                     ];
                 } else {
-                    // They are on a paid plan, show the full prompt
                     next_actions = [
                         { type: 'create_onboarding_task', label: 'Create Onboarding Task' },
                         { type: 'send_welcome_email', label: 'Draft Welcome Email' }
@@ -1399,23 +1417,16 @@ app.put('/api/sales/deals/:dealId', authenticateToken, async (req, res) => {
                 }
             }
         }
-
         await client.query('COMMIT');
-
-        
-        // CHANGE: Fetch the full deal data WITH the client name to send back to the frontend
         const fullDealDataRes = await client.query(
-            `SELECT sd.*, c.name as client_name 
-             FROM sales_deals sd
-             JOIN clients c ON sd.client_id = c.id
-             WHERE sd.id = $1`,
+            `SELECT sd.*, c.name as client_name
+            FROM sales_deals sd
+            JOIN clients c ON sd.client_id = c.id
+            WHERE sd.id = $1`,
             [updatedDealId]
         );
         const fullDealData = fullDealDataRes.rows[0];
-
-        
-         res.status(200).json({ deal: fullDealData, next_actions, automation_result });
-
+        res.status(200).json({ deal: fullDealData, next_actions, automation_result });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Error updating deal:', err);
@@ -1572,52 +1583,42 @@ app.post('/api/ai/generate-leads', authenticateToken, async (req, res) => {
 
 // POST endpoint to send a generated email to a client.
 app.post('/api/sales/send-email', authenticateToken, async (req, res) => {
-    const { recipientEmail, subject, body, clientId, newClientName } = req.body;
-    const { userId } = req.user;
-    const client = await pool.connect();
-
-    try {
-        await client.query('BEGIN');
-        let finalClientId = clientId;
-
-        // If it's a new client, create them first
-        if (!finalClientId && newClientName && recipientEmail) {
-            const newClientRes = await client.query(
-                'INSERT INTO clients (user_id, name, email) VALUES ($1, $2, $3) RETURNING id',
-                [userId, newClientName, recipientEmail]
-            );
-            finalClientId = newClientRes.rows[0].id;
-        }
-
-        if (!finalClientId) {
-            throw new Error('Client could not be identified or created.');
-        }
-
-        // Send the email via SendGrid
-        const msg = {
-            to: recipientEmail,
-            from: 'noreply@entruvi.com', // Your verified sender
-            subject: subject,
-            html: body.replace(/\n/g, '<br>')
-        };
-        await sgMail.send(msg);
-
-        // Log the sent email in our new interactions table
-        await client.query(
-            'INSERT INTO client_interactions (user_id, client_id, type, content) VALUES ($1, $2, $3, $4)',
-            [userId, finalClientId, 'sent_email', `Subject: ${subject}\n\n${body}`]
-        );
-
-        await client.query('COMMIT');
-        res.status(200).json({ message: 'Email sent and logged successfully!' });
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Error sending email:', err);
-        res.status(500).json({ message: err.message || 'Server error while sending email.' });
-    } finally {
-        client.release();
-    }
+    const { recipientEmail, subject, body, clientId, newClientName } = req.body;
+    const { userId, email: userEmailFromToken } = req.user; // Get user's email from the JWT token
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        let finalClientId = clientId;
+        if (!finalClientId && newClientName && recipientEmail) {
+            const newClientRes = await client.query(
+                'INSERT INTO clients (user_id, name, email) VALUES ($1, $2, $3) RETURNING id',
+                [userId, newClientName, recipientEmail]
+            );
+            finalClientId = newClientRes.rows[0].id;
+        }
+        if (!finalClientId) {
+            throw new Error('Client could not be identified or created.');
+        }
+        const msg = {
+            to: recipientEmail,
+            from: userEmailFromToken, // --- UPDATED: Use user's email as 'from' address ---
+            subject: subject,
+            html: body.replace(/\n/g, '<br>')
+        };
+        await sgMail.send(msg);
+        await client.query(
+            'INSERT INTO client_interactions (user_id, client_id, type, content) VALUES ($1, $2, $3, $4)',
+            [userId, finalClientId, 'sent_email', `Subject: ${subject}\n\n${body}`]
+        );
+        await client.query('COMMIT');
+        res.status(200).json({ message: 'Email sent and logged successfully!' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error sending email:', err);
+        res.status(500).json({ message: err.message || 'Server error while sending email.' });
+    } finally {
+        client.release();
+    }
 });
 
 app.post('/api/ai/clean-text', authenticateToken, async (req, res) => {
@@ -1733,7 +1734,7 @@ app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) =>
         // 5. Send the email
         const msg = {
             to: user.email,
-            from: 'noreply@entruvi.com', // Must be a verified sender
+            from: 'noreply@entruvi.com', 
             subject: `🚀 Your Weekly Pulse from Entruvi`,
             html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto;">${emailBody}</div>`
         };
@@ -1748,7 +1749,7 @@ app.post('/api/ai/generate-weekly-pulse', authenticateToken, async (req, res) =>
     }
 });
 
-// ➡️ NEW: VIRTUAL ASSISTANT (TASKS) API ROUTES
+// NEW: VIRTUAL ASSISTANT (TASKS) API ROUTES
 // =========================================================================
 // GET all non-deleted tasks for the logged-in user
 app.get('/api/tasks', authenticateToken, async (req, res) => {
@@ -1876,7 +1877,6 @@ app.put('/api/tasks/:taskId/restore', authenticateToken, async (req, res) => {
 });
 
 // ➡️ NEW: This endpoint purges tasks from the trash older than 30 days.
-// This would ideally be called by a scheduled cron job.
 app.delete('/api/tasks/trash/purge', authenticateToken, async (req, res) => {
     const { userId } = req.user; // Can be adapted for admin use later
     try {
@@ -1911,24 +1911,20 @@ app.delete('/api/tasks/:taskId/permanent', authenticateToken, async (req, res) =
 
 // ➡️ NEW: GET notifications for overdue and upcoming tasks
 app.get('/api/notifications', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    try {
-        const now = new Date();
-        const notifications = await pool.query(
-            `SELECT id, title, due_date, 
-             CASE 
-               WHEN due_date < $2 THEN 'overdue'
-               ELSE 'due_today'
-             END as type
-             FROM tasks 
-             WHERE user_id = $1 AND is_deleted = FALSE AND status = 'incomplete' AND due_date::date <= $2::date`,
-            [userId, now]
-        );
-        res.status(200).json(notifications.rows);
-    } catch (err) {
-        console.error('Error fetching notifications:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { userId } = req.user;
+    try {
+        const notifications = await pool.query(
+            `SELECT id, title, due_date AS "dueDate"
+             FROM tasks
+             WHERE user_id = $1 AND is_deleted = FALSE AND status = 'incomplete' AND due_date IS NOT NULL AND due_date <= NOW()
+             ORDER BY due_date DESC`,
+            [userId]
+        );
+        res.status(200).json(notifications.rows);
+    } catch (err) {
+        console.error('Error fetching notifications:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // ➡️ NEW: FINANCE API ROUTES
@@ -1948,6 +1944,27 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
         console.error('Error adding transaction:', err);
         res.status(500).json({ message: 'Server error' });
     }
+});
+
+app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { title, amount, type, category, transaction_date, scope } = req.body;
+    const { userId } = req.user;
+    try {
+        const result = await pool.query(
+            `UPDATE transactions SET
+              title = $1, amount = $2, type = $3, category = $4, transaction_date = $5, scope = $6
+              WHERE id = $7 AND user_id = $8 RETURNING *`,
+            [title, amount, type, category, transaction_date, scope, id, userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Transaction not found or not authorized.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating transaction:', err);
+        res.status(500).json({ message: 'Server error while updating transaction.' });
+    }
 });
 
 app.post('/api/transactions/transfer', authenticateToken, async (req, res) => {
@@ -1981,10 +1998,9 @@ app.post('/api/transactions/transfer', authenticateToken, async (req, res) => {
 
 
 // GET a summary of financial data
-app.get('/api/finance/summary', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/finance/summary', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     const { period = 'monthly', scope = 'business' } = req.query;
-
     let dateTrunc, interval, dateFormat, timePeriod, intervalUnit;
     switch (period) {
         case 'daily':
@@ -2027,16 +2043,13 @@ app.get('/api/finance/summary', authenticateToken, async (req, res) => {
             intervalUnit = 'months';
             dateFormat = (date) => new Date(date).toLocaleString('default', { month: 'short', year: 'numeric' });
     }
-
     try {
-        const metricsQuery = await pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses FROM transactions WHERE user_id = $1 AND scope = $2`, [userId, scope]);
+        const metricsQuery = await pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses FROM transactions WHERE user_id = ANY($1) AND scope = $2`, [dataScopeIds, scope]);
         const { total_income, total_expenses } = metricsQuery.rows[0];
         const net_profit = total_income - total_expenses;
         const burn_rate = total_expenses > total_income ? (total_expenses - total_income) / 12 : 0;
         const runway = burn_rate > 0 ? total_income / burn_rate : Infinity;
-
-        const recentTransactionsQuery = await pool.query('SELECT * FROM transactions WHERE user_id = $1 AND scope = $2 ORDER BY transaction_date DESC LIMIT 5', [userId, scope]);
-        
+        const recentTransactionsQuery = await pool.query('SELECT * FROM transactions WHERE user_id = ANY($1) AND scope = $2 ORDER BY transaction_date DESC LIMIT 5', [dataScopeIds, scope]);
         const chartQuery = await pool.query(
             `WITH date_series AS (
                 SELECT generate_series(
@@ -2046,24 +2059,23 @@ app.get('/api/finance/summary', authenticateToken, async (req, res) => {
                 )::DATE AS period_start
             ),
             transaction_data AS (
-                SELECT 
-                    DATE_TRUNC('${dateTrunc}', transaction_date)::DATE as period_start, 
-                    SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income, 
-                    SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses 
-                FROM transactions 
-                WHERE user_id = $1 AND scope = $2
+                SELECT
+                    DATE_TRUNC('${dateTrunc}', transaction_date)::DATE as period_start,
+                    SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+                    SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
+                FROM transactions
+                WHERE user_id = ANY($1) AND scope = $2
                 GROUP BY period_start
             )
-            SELECT 
+            SELECT
                 ds.period_start,
                 COALESCE(td.income, 0) as income,
                 COALESCE(td.expenses, 0) as expenses
             FROM date_series ds
             LEFT JOIN transaction_data td ON ds.period_start = td.period_start
             ORDER BY ds.period_start ASC`,
-            [userId, scope]
+            [dataScopeIds, scope]
         );
-
         res.status(200).json({
             metrics: {
                 netProfit: parseFloat(net_profit).toFixed(2),
@@ -2130,23 +2142,20 @@ app.post('/api/ai/analyze-finances', authenticateToken, async (req, res) => {
 // =========================================================================
 
 // GET marketing summary data (metrics and campaigns)
-app.get('/api/marketing/summary', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/marketing/summary', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
         const metricsQuery = await pool.query(
-            `SELECT 
+            `SELECT
                 COALESCE(SUM(reach), 0) as total_reach,
                 COALESCE(SUM(engagement), 0) as total_engagement,
                 COALESCE(SUM(conversions), 0) as total_conversions,
                 COALESCE(SUM(ad_spend), 0) as total_ad_spend
-             FROM campaigns WHERE user_id = $1`,
-            [userId]
+            FROM campaigns WHERE user_id = ANY($1)`,
+            [dataScopeIds]
         );
-
-        const campaignsQuery = await pool.query('SELECT * FROM campaigns WHERE user_id = $1 ORDER BY start_date DESC', [userId]);
-
+        const campaignsQuery = await pool.query('SELECT * FROM campaigns WHERE user_id = ANY($1) ORDER BY start_date DESC', [dataScopeIds]);
         const engagementRate = metricsQuery.rows[0].total_reach > 0 ? (metricsQuery.rows[0].total_engagement / metricsQuery.rows[0].total_reach * 100).toFixed(1) : 0;
-
         res.status(200).json({
             metrics: {
                 ...metricsQuery.rows[0],
@@ -2177,10 +2186,10 @@ app.post('/api/campaigns', authenticateToken, async (req, res) => {
 });
 
 // GET content calendar entries
-app.get('/api/content-calendar', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/content-calendar', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
-        const content = await pool.query('SELECT * FROM content_calendar WHERE user_id = $1 ORDER BY post_date ASC', [userId]);
+        const content = await pool.query('SELECT * FROM content_calendar WHERE user_id = ANY($1) ORDER BY post_date ASC', [dataScopeIds]);
         res.status(200).json(content.rows);
     } catch (err) {
         console.error('Error fetching content calendar:', err);
@@ -2230,34 +2239,30 @@ app.post('/api/ai/generate-post-idea', authenticateToken, async (req, res) => {
 
 // ➡️ NEW: MAIN DASHBOARD API ROUTE
 // =========================================================================
-app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/dashboard/overview', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
         const [salesResult, tasksResult, financeMTDResult, financeWeeklyResult, clientsResult, dealsWonResult] = await Promise.all([
-            pool.query(`SELECT COUNT(*) as open_deals, COALESCE(SUM(value), 0) as pipeline_value FROM sales_deals WHERE user_id = $1 AND stage != 'Closed Won' AND stage != 'Closed Lost'`, [userId]),
-            pool.query(`SELECT COUNT(*) as upcoming_tasks FROM tasks WHERE user_id = $1 AND status = 'incomplete' AND due_date >= NOW() AND is_deleted = FALSE`, [userId]),
-            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as monthly_revenue FROM transactions WHERE user_id = $1 AND scope = 'business' AND transaction_date >= DATE_TRUNC('month', NOW())`, [userId]),
-            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as weekly_expenses, COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as weekly_revenue FROM transactions WHERE user_id = $1 AND scope = 'business' AND transaction_date >= DATE_TRUNC('week', NOW())`, [userId]),
-            pool.query(`SELECT COUNT(*) as new_clients_this_month FROM clients WHERE user_id = $1 AND created_at >= DATE_TRUNC('month', NOW())`, [userId]),
-            pool.query(`SELECT COUNT(*) as deals_won_this_month FROM sales_deals WHERE user_id = $1 AND stage = 'Closed Won' AND updated_at >= DATE_TRUNC('month', NOW())`, [userId])
+            pool.query(`SELECT COUNT(*) as open_deals, COALESCE(SUM(value), 0) as pipeline_value FROM sales_deals WHERE user_id = ANY($1) AND stage != 'Closed Won' AND stage != 'Closed Lost'`, [dataScopeIds]),
+            pool.query(`SELECT COUNT(*) as upcoming_tasks FROM tasks WHERE user_id = ANY($1) AND status = 'incomplete' AND due_date >= NOW() AND is_deleted = FALSE`, [dataScopeIds]),
+            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as monthly_revenue FROM transactions WHERE user_id = ANY($1) AND scope = 'business' AND transaction_date >= DATE_TRUNC('month', NOW())`, [dataScopeIds]),
+            pool.query(`SELECT COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as weekly_expenses, COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as weekly_revenue FROM transactions WHERE user_id = ANY($1) AND scope = 'business' AND transaction_date >= DATE_TRUNC('week', NOW())`, [dataScopeIds]),
+            pool.query(`SELECT COUNT(*) as new_clients_this_month FROM clients WHERE user_id = ANY($1) AND created_at >= DATE_TRUNC('month', NOW())`, [dataScopeIds]),
+            pool.query(`SELECT COUNT(*) as deals_won_this_month FROM sales_deals WHERE user_id = ANY($1) AND stage = 'Closed Won' AND updated_at >= DATE_TRUNC('month', NOW())`, [dataScopeIds])
         ]);
-
         const pipelineValue = parseFloat(salesResult.rows[0].pipeline_value);
         const monthlyRevenue = parseFloat(financeMTDResult.rows[0].monthly_revenue);
         const weeklyRevenue = parseFloat(financeWeeklyResult.rows[0].weekly_revenue);
         const weeklyExpenses = parseFloat(financeWeeklyResult.rows[0].weekly_expenses);
         const weeklyCashFlow = weeklyRevenue - weeklyExpenses;
-
         const profitScore = Math.min(Math.max(monthlyRevenue / 5000, 0), 1) * 50;
         const pipelineScore = Math.min(Math.max(pipelineValue / 10000, 0), 1) * 30;
         const taskScore = Math.max(1 - (parseInt(tasksResult.rows[0].upcoming_tasks) / 10), 0) * 20;
         const healthScore = Math.round(profitScore + pipelineScore + taskScore);
-
-        const userRes = await pool.query('SELECT company_description FROM users WHERE id = $1', [userId]);
-        const companyDescription = userRes.rows[0]?.company_description || "a small business"; 
-
+        const userRes = await pool.query('SELECT company_description FROM users WHERE id = $1', [req.user.userId]); // Use individual user ID for personalized content
+        const companyDescription = userRes.rows[0]?.company_description || "a small business";
         const recommendationPrompt = `
-            As an AI business assistant for a solo entrepreneur whose business is: "${companyDescription}", 
+            As an AI business assistant for a solo entrepreneur whose business is: "${companyDescription}",
             analyze the following snapshot of their business and provide 3 short, actionable recommendations.
             - Current month's revenue: $${monthlyRevenue.toFixed(2)}
             - Open sales pipeline value: $${pipelineValue.toFixed(2)}
@@ -2269,16 +2274,11 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
             model: "gpt-3.5-turbo",
             messages: [{ role: "user", content: recommendationPrompt }],
         });
-
         let recommendations;
         try {
             const aiResponseText = completion.choices[0].message.content.trim();
-            
-            // FIX: Robust JSON parsing to handle trailing commas or extra characters
             const cleanedResponse = aiResponseText.replace(/,\s*([\]}])/g, '$1');
-            
             recommendations = JSON.parse(cleanedResponse);
-            
         } catch (e) {
             console.error("Failed to parse AI recommendations, using fallback.", e);
             recommendations = [
@@ -2287,7 +2287,6 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
                 { icon: "🚀", text: "Consider a new marketing campaign to generate more leads." }
             ];
         }
-
         res.status(200).json({
             metrics: {
                 monthlyRevenue: monthlyRevenue.toFixed(2),
@@ -2312,33 +2311,26 @@ app.get('/api/dashboard/overview', authenticateToken, async (req, res) => {
 });
 
 // ➡️ Endpoint for recent dashboard activity
-app.get('/api/dashboard/recent-activity', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/dashboard/recent-activity', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     try {
         const query = `
             SELECT 'DEAL' AS type, sd.name AS description, sd.stage AS status, sd.value AS amount, sd.created_at AS timestamp
-            FROM sales_deals sd 
-            WHERE sd.user_id = $1
-
+            FROM sales_deals sd
+            WHERE sd.user_id = ANY($1)
             UNION ALL
-
             SELECT 'TASK' AS type, t.title AS description, t.status AS status, NULL AS amount, t.created_at AS timestamp
-            FROM tasks t 
-            WHERE t.user_id = $1 AND t.is_deleted = FALSE
-
+            FROM tasks t
+            WHERE t.user_id = ANY($1) AND t.is_deleted = FALSE
             UNION ALL
-
             SELECT 'INVOICE' AS type, CONCAT('Invoice ', i.invoice_number, ' to ', c.name) AS description, i.status AS status, i.total_amount AS amount, i.created_at AS timestamp
-            FROM invoices i 
-            JOIN clients c ON i.client_id = c.id 
-            WHERE i.user_id = $1
-
+            FROM invoices i
+            JOIN clients c ON i.client_id = c.id
+            WHERE i.user_id = ANY($1)
             ORDER BY timestamp DESC
             LIMIT 10;
         `;
-        console.log("Running query [dashboard/recent-activity]:", query, "with userId:", userId);
-
-        const activityResult = await pool.query(query, [userId]);
+        const activityResult = await pool.query(query, [dataScopeIds]);
         res.status(200).json(activityResult.rows);
     } catch (err) {
         console.error('Error fetching recent activity:', err);
@@ -2408,18 +2400,18 @@ app.post('/api/ai/ask', authenticateToken, async (req, res) => {
 // =========================================================================
 
 // GET all invoices with search
-app.get('/api/invoices', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
+app.get('/api/invoices', authenticateToken, teamDataMiddleware, async (req, res) => {
+    const { dataScopeIds } = req.user;
     const { search = '' } = req.query;
     try {
         const query = `
-            SELECT i.*, c.name as client_name 
+            SELECT i.*, c.name as client_name
             FROM invoices i
             JOIN clients c ON i.client_id = c.id
-            WHERE i.user_id = $1 
+            WHERE i.user_id = ANY($1)
             AND (c.name ILIKE $2 OR i.invoice_number ILIKE $2)
             ORDER BY i.issue_date DESC`;
-        const invoices = await pool.query(query, [userId, `%${search}%`]);
+        const invoices = await pool.query(query, [dataScopeIds, `%${search}%`]);
         res.status(200).json(invoices.rows);
     } catch (err) {
         console.error('Error fetching invoices:', err);
@@ -2428,19 +2420,17 @@ app.get('/api/invoices', authenticateToken, async (req, res) => {
 });
 
 // GET a single invoice with its line items
-app.get('/api/invoices/:id', authenticateToken, async (req, res) => {
+app.get('/api/invoices/:id', authenticateToken, teamDataMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { userId } = req.user;
+    const { dataScopeIds } = req.user;
     try {
-        const invoiceRes = await pool.query('SELECT i.*, c.name as client_name, c.email as client_email FROM invoices i JOIN clients c ON i.client_id = c.id WHERE i.id = $1 AND i.user_id = $2', [id, userId]);
+        const invoiceRes = await pool.query('SELECT i.*, c.name as client_name, c.email as client_email FROM invoices i JOIN clients c ON i.client_id = c.id WHERE i.id = $1 AND i.user_id = ANY($2)', [id, dataScopeIds]);
         if (invoiceRes.rows.length === 0) {
             return res.status(404).json({ message: 'Invoice not found' });
         }
         const lineItemsRes = await pool.query('SELECT * FROM invoice_line_items WHERE invoice_id = $1', [id]);
-        
         const invoice = invoiceRes.rows[0];
         invoice.lineItems = lineItemsRes.rows;
-        
         res.status(200).json(invoice);
     } catch (err) {
         console.error('Error fetching single invoice:', err);
@@ -2810,7 +2800,7 @@ app.get('/api/public/intake-form/:formId', async (req, res) => {
             return res.status(404).json({ message: 'Form not found.' });
         }
         res.status(200).json(form.rows[0]);
-    // eslint-disable-next-line no-unused-vars
+    // / eslint-disable-next-line no-unused-vars
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -2865,41 +2855,76 @@ app.post('/api/public/intake-form/:formId/submit', async (req, res) => {
 // CREATE CHECKOUT SESSION FOR SUBSCRIPTIONS
 // =========================================================================
 app.post('/api/subscriptions/create-checkout-session', authenticateToken, async (req, res) => {
-  const { planName } = req.body;
-  const { email } = req.user;
+    const { planName, isAnnual } = req.body;
+    const { email } = req.user;
+    const priceMap = {
+        basic_monthly: process.env.STRIPE_BASIC_MONTHLY_PRICE_ID,
+        basic_annual: process.env.STRIPE_BASIC_ANNUAL_PRICE_ID,
+        premium_monthly: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
+        premium_annual: process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID,
+        team_monthly: process.env.STRIPE_TEAM_MONTHLY_PRICE_ID,
+        team_annual: process.env.STRIPE_TEAM_ANNUAL_PRICE_ID,
+    };
+    const priceId = priceMap[`${planName.toLowerCase()}_${isAnnual ? 'annual' : 'monthly'}`];
+    if (!priceId) {
+        return res.status(400).json({ message: `Invalid plan name: ${planName} or billing period.` });
+    }
+    try {
+        const session = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            payment_method_types: ['card'],
+            customer_email: email,
+            line_items: [{
+                price: priceId,
+                quantity: 1,
+            }],
+            subscription_data: {
+                metadata: {
+                    plan_type: planName.toLowerCase(),
+                },
+            },
+            success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+        });
+        return res.status(200).json({ url: session.url });
+    } catch (err) {
+        console.error('Error creating Stripe subscription session:', err);
+        return res.status(500).json({ message: 'Server error while creating payment session.' });
+    }
+});
 
-  // Map plan names to Stripe Price IDs
-  const priceMap = {
-    Solo: process.env.STRIPE_SOLO_PLAN_PRICE_ID,
-    Team: process.env.STRIPE_TEAM_PLAN_PRICE_ID,
-  };
-
-  const priceId = priceMap[planName];
-  if (!priceId) {
-    return res.status(400).json({ message: `Invalid plan name: ${planName}` });
-  }
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      customer_email: email,
-      line_items: [{
-        price: priceId,
-        quantity: 1,
-      }],
-      subscription_data: {
-        trial_period_days: 14, // optional
-      },
-      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
-    });
-
-    return res.status(200).json({ url: session.url });
-  } catch (err) {
-    console.error('Error creating Stripe subscription session:', err);
-    return res.status(500).json({ message: 'Server error while creating payment session.' });
-  }
+// =========================================================================
+// AUTOMATION REMINDER CRON JOB ENDPOINT
+// =========================================================================
+app.post('/api/automations/send-subscription-reminders', async (req, res) => {
+    // NOTE: This endpoint should be secured with an API key if exposed publicly
+    try {
+        const reminders = await pool.query(`
+            SELECT name, email, plan_type, subscription_start_date
+            FROM users
+            WHERE subscription_status = 'active'
+              AND (
+                (plan_type IN ('premium', 'team') AND subscription_start_date < NOW() - INTERVAL '53 days' AND subscription_start_date >= NOW() - INTERVAL '60 days')
+                OR
+                (plan_type IN ('basic', 'premium', 'team') AND subscription_start_date < NOW() - INTERVAL '23 days' AND subscription_start_date >= NOW() - INTERVAL '30 days')
+            )
+        `);
+        if (reminders.rows.length > 0) {
+            for (const user of reminders.rows) {
+                const msg = {
+                    to: user.email,
+                    from: 'noreply@entruvi.com',
+                    subject: 'Your Entruvi Subscription is Ending Soon!',
+                    html: `<p>Hello ${user.name},</p><p>Your ${user.plan_type} subscription is ending soon. Please renew your plan to continue uninterrupted access to all of our features.</p><p>Thank you,<br/>The Entruvi Team</p>`,
+                };
+                await sgMail.send(msg);
+            }
+        }
+        res.status(200).json({ message: `Sent ${reminders.rows.length} renewal reminders.` });
+    } catch (error) {
+        console.error('Error sending subscription reminders:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 

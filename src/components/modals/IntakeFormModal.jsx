@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { XCircle, Loader2, Plus, Trash2, Copy, Check } from 'lucide-react';
 import Card from '../ui/Card';
 
+
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
+
 
 export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
     const [form, setForm] = useState(initialForm || { questions: [{ text: 'What are your primary goals for this project?' }] });
@@ -28,6 +30,7 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
         setIsLoading(true);
         await onSave(form.questions);
         setIsLoading(false);
+        onClose();
     };
     
     const copyLinkToClipboard = () => {
@@ -67,16 +70,16 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
 
                 <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
                     {form.id && (
-                         <div className="space-y-2">
+                        <div className="space-y-2">
                              <label className="text-sm font-semibold">Your Shareable Form Link:</label>
                              <div className="flex items-center gap-2">
-                                <input type="text" readOnly value={`${window.location.origin}/form/${form.id}`} className={`${formInputClasses} text-text-secondary dark:text-dark-text-secondary`} />
-                                <button onClick={copyLinkToClipboard} className="bg-slate-200 dark:bg-slate-700 px-4 py-3 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
-                                    {isCopied ? <Check size={16} className="text-green-500"/> : <Copy size={16} />}
-                                </button>
+                                 <input type="text" readOnly value={`${window.location.origin}/form/${form.id}`} className={`${formInputClasses} text-text-secondary dark:text-dark-text-secondary`} />
+                                 <button onClick={copyLinkToClipboard} className="bg-slate-200 dark:bg-slate-700 px-4 py-3 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
+                                     {isCopied ? <Check size={16} className="text-green-500"/> : <Copy size={16} />}
+                                 </button>
                              </div>
                          </div>
-                    )}
+                     )}
                 </div>
 
                 <div className="flex justify-end gap-2 mt-4">
@@ -89,5 +92,3 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
         </div>
     );
 };
-
-// export default IntakeFormModal;

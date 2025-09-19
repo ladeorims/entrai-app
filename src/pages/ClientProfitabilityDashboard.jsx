@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, BarChart3, TrendingUp, DollarSign } from 'lucide-react';
+import { useAuth } from '../AuthContext';
 import Card from '../components/ui/Card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const ClientProfitabilityDashboard = ({ token }) => {
+const ClientProfitabilityDashboard = () => {
+    const { token } = useAuth();
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [metrics, setMetrics] = useState({ topClient: '', highestValue: 0, averageValue: 0 });

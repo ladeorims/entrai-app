@@ -1,25 +1,29 @@
-// src/pages/ResetPasswordPage.jsx
-
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { Loader2, KeyRound } from 'lucide-react';
+import { KeyRound, ArrowLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import BrandedLoader from '../components/BrandedLoader';
 
-const ResetPasswordPage = ({ setActiveView, setAuthMessage }) => {
+const ResetPasswordPage = () => {
     const [token, setToken] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const { setAuthMessage } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
+        const urlParams = new URLSearchParams(location.search);
         const tokenFromUrl = urlParams.get('token');
         if (tokenFromUrl) {
             setToken(tokenFromUrl);
         } else {
             setMessage({ type: 'error', text: 'No reset token found. Please request a new link.' });
         }
-    }, []);
+    }, [location.search]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -38,7 +42,7 @@ const ResetPasswordPage = ({ setActiveView, setAuthMessage }) => {
             const result = await res.json();
             if (!res.ok) throw new Error(result.message);
             setAuthMessage({ type: 'success', text: result.message });
-            setActiveView('Auth');
+            navigate('/auth');
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
@@ -46,8 +50,22 @@ const ResetPasswordPage = ({ setActiveView, setAuthMessage }) => {
         }
     };
 
+    if (!token) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-primary-bg dark:bg-dark-primary-bg p-4">
+                <Card className="max-w-md w-full">
+                    <h1 className="text-2xl font-bold text-center mb-2">Invalid Reset Link</h1>
+                    <p className="text-center text-text-secondary dark:text-dark-text-secondary mb-6">{message.text || 'The link you are using is invalid or has expired.'}</p>
+                    <button onClick={() => navigate('/auth')} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center">
+                        Return to Login
+                    </button>
+                </Card>
+            </div>
+        );
+    }
+    
     return (
-        <div className="flex items-center justify-center min-h-screen bg-primary-bg p-4">
+        <div className="flex items-center justify-center min-h-screen bg-primary-bg dark:bg-dark-primary-bg p-4">
             <Card className="max-w-md w-full">
                 <h1 className="text-2xl font-bold text-center mb-2">Set a New Password</h1>
                 <p className="text-center text-text-secondary dark:text-dark-text-secondary mb-6">Please enter and confirm your new password below.</p>
@@ -66,7 +84,7 @@ const ResetPasswordPage = ({ setActiveView, setAuthMessage }) => {
                         <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="form-input w-full pl-10" required />
                     </div>
                     <button type="submit" disabled={isLoading || !token} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Reset Password'}
+                        {isLoading ? <BrandedLoader text="Resetting..." /> : 'Reset Password'}
                     </button>
                 </form>
             </Card>

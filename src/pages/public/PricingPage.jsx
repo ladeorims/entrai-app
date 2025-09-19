@@ -1,51 +1,111 @@
-// src/pages/public/PricingPage.jsx
-
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PublicLayout from './PublicLayout';
-import { Check } from 'lucide-react';
+import { Check, Star } from 'lucide-react';
 
-const PricingCard = ({ plan, price, description, features, popular = false, onSelectPlan }) => (
-    <div className={`p-[1px] rounded-2xl ${popular ? 'bg-gradient-to-br from-accent-start to-accent-end' : 'bg-slate-200 dark:bg-slate-800'}`}>
-        <div className="bg-card-bg dark:bg-dark-card-bg rounded-[15px] h-full p-8 flex flex-col">
-            <h3 className="text-2xl font-bold">{plan.name}</h3>
-            <p className="text-text-secondary dark:text-dark-text-secondary mt-2">{description}</p>
-            <div className="my-6">
-                <span className="text-5xl font-extrabold">{price}</span>
-                <span className="text-text-secondary dark:text-dark-text-secondary">/ month</span>
-            </div>
-            <ul className="space-y-3 text-text-secondary dark:text-dark-text-secondary mb-8 text-sm">
-                {features.map(feature => (
-                    <li key={feature} className="flex items-center gap-3">
-                        <Check size={16} className="text-green-500 flex-shrink-0" />
-                        <span>{feature}</span>
-                    </li>
-                ))}
-            </ul>
-            <div className="flex-grow"></div>
-            <button onClick={() => onSelectPlan(plan.id)} className={`w-full mt-4 font-semibold py-3 rounded-lg transition hover:opacity-90 ${popular ? 'bg-gradient-to-r from-accent-start to-accent-end text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                {plan.cta}
-            </button>
-        </div>
-    </div>
-);
+const PricingPage = () => {
+    const [isAnnual, setIsAnnual] = useState(false);
+    const navigate = useNavigate();
 
-const PricingPage = ({ setActiveView, onSelectPlan, onLaunchApp, onStartTrial }) => {
-    const plans = [
-        { id: 'Starter', name: 'Starter', price: '$0', cta: 'Start for Free', description: 'For freelancers getting started.', features: ['1 User', 'Dashboard & Assistant', '5 Invoices / month', '10 Deals / month', '20 AI Actions / month'] },
-        { id: 'Solo', name: 'Growth', price: '$15', cta: 'Start Free Trial', description: 'For solopreneurs scaling up.', features: ['Up to 5 Users', 'Everything in Starter', 'Full Access to All Hubs', 'Unlimited Invoices & Deals', 'Native Automations & AI', '200 AI Actions / month'], popular: true },
-        { id: 'Team', name: 'Business', price: '$45', cta: 'Start Free Trial', description: 'For growing startups.', features: ['Up to 20 Users', 'Everything in Growth', 'Collaboration Tools', 'Advanced Analytics', 'Priority Support', '600+ AI Actions / month'] }
+    const pricing = [
+        {
+            name: 'Basic',
+            priceMonthly: 15,
+            priceAnnual: 150,
+            description: 'For individuals and side projects.',
+            features: [
+                'Unlimited clients',
+                'Unlimited invoices & deals',
+                'Advanced dashboards & analytics',
+                '50 AI actions / month',
+                '60-day money-back guarantee',
+            ],
+            isHighlighted: false,
+        },
+        {
+            name: 'Premium',
+            priceMonthly: 22,
+            priceAnnual: 220,
+            description: 'For solopreneurs running a full-time business.',
+            features: [
+                'All Basic Plan features',
+                'Unlimited AI actions',
+                'Native automations',
+                '60-day money-back guarantee',
+                '2 months free with annual subscription',
+            ],
+            isHighlighted: true,
+        },
+        {
+            name: 'Team',
+            priceMonthly: 75,
+            priceAnnual: 750,
+            description: 'For small, collaborative teams.',
+            features: [
+                'All Premium Plan features',
+                'Up to 5 team members',
+                'Team collaboration tools',
+                '60-day money-back guarantee',
+                '2 months free with annual subscription',
+            ],
+            isHighlighted: false,
+        },
     ];
 
+    const handleSelectPlan = () => {
+        navigate('/auth');
+    };
+
     return (
-        <PublicLayout activeView="Pricing" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
+        <PublicLayout>
             <div className="container mx-auto px-5 py-20 max-w-7xl text-center">
-                <h1 className="text-4xl md:text-6xl font-bold">Simple, transparent pricing.</h1>
+                <h1 className="text-4xl md:text-6xl font-bold">Simple, fair pricing</h1>
                 <p className="mt-4 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-2xl mx-auto">
-                    Choose a plan that grows with you — no hidden fees, cancel anytime.
+                    60-day money-back guarantee.
                 </p>
-                <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
-                    {plans.map(plan => (
-                        <PricingCard key={plan.id} plan={plan} price={plan.price} description={plan.description} features={plan.features} popular={plan.popular} onSelectPlan={onSelectPlan} />
+
+                <div className="flex justify-center items-center my-10 space-x-4">
+                    <span className="text-lg font-semibold">Monthly</span>
+                    <button onClick={() => setIsAnnual(!isAnnual)} className={`relative inline-flex items-center h-8 rounded-full w-14 transition-colors ${isAnnual ? 'bg-gradient-to-r from-accent-start to-accent-end' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                        <span className={`transform transition-transform duration-300 w-6 h-6 rounded-full bg-white absolute ${isAnnual ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </button>
+                    <div className="flex items-center">
+                        <span className="text-lg font-semibold">Annually</span>
+                        <span className="ml-2 px-2 py-1 text-xs font-bold text-white bg-green-500 rounded-full">2 Months Free</span>
+                    </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-8 items-stretch">
+                    {pricing.map((plan) => (
+                        <div key={plan.name} className={`p-6 rounded-2xl flex flex-col ${plan.isHighlighted ? 'bg-gradient-to-br from-accent-start/30 to-accent-end/30 border border-accent-start/50 dark:border-dark-accent-mid/50' : 'bg-card-bg dark:bg-dark-card-bg border border-slate-200 dark:border-slate-800'}`}>
+                            <div className="text-left flex-1">
+                                {plan.isHighlighted && <span className="mb-2 inline-block px-3 py-1 text-xs font-bold text-white bg-gradient-to-r from-accent-start to-accent-end rounded-full">Most Popular</span>}
+                                <h2 className="text-2xl font-bold mt-2">{plan.name}</h2>
+                                <p className="mt-2 text-text-secondary dark:text-dark-text-secondary">{plan.description}</p>
+                                <div className="flex items-baseline mt-4">
+                                    <span className="text-5xl font-extrabold">
+                                        ${isAnnual ? plan.priceAnnual : plan.priceMonthly}
+                                    </span>
+                                    <span className="text-xl text-text-secondary dark:text-dark-text-secondary ml-1">
+                                        {isAnnual ? '/yr' : '/mo'}
+                                    </span>
+                                </div>
+                                <ul className="mt-6 space-y-3 text-sm">
+                                    {plan.features.map((feature, index) => (
+                                        <li key={index} className="flex items-start">
+                                            <Check size={18} className="text-green-500 mr-2 flex-shrink-0" />
+                                            <span className="text-text-secondary dark:text-dark-text-secondary text-left">{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <button
+                                onClick={() => handleSelectPlan(plan.name, isAnnual)}
+                                className={`w-full mt-8 py-3 rounded-lg font-semibold text-white transition-opacity hover:opacity-90 ${plan.isHighlighted ? 'bg-gradient-to-r from-accent-start to-accent-end' : 'bg-slate-800 dark:bg-white dark:text-slate-800'}`}
+                            >
+                                Choose {plan.name}
+                            </button>
+                        </div>
                     ))}
                 </div>
             </div>

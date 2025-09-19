@@ -6,13 +6,15 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Megaphone, PlusCircle, Wand2, XCircle, Loader2, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
+import { useAuth } from '../AuthContext';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formSelectClasses = `${formInputClasses} form-select`;
 const formTextareaClasses = `${formInputClasses} h-24`;
 
-const MarketingDashboard = ({ token }) => {
-    const [summary, setSummary] = useState({ metrics: {}, campaigns: [] });
+
+const MarketingDashboard = () => {
+    const { token } = useAuth();    const [summary, setSummary] = useState({ metrics: {}, campaigns: [] });
     const [content, setContent] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCampaignModalVisible, setIsCampaignModalVisible] = useState(false);

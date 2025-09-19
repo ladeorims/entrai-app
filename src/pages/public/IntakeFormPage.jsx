@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, CheckCircle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import AnimatedLogo from '../../components/AnimatedLogo';
+import BrandedLoader from '../../components/BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
-// const formTextareaClasses = `${formInputClasses} h-24`;
 
 export const IntakeFormPage = () => {
     const [form, setForm] = useState(null);
@@ -76,17 +76,27 @@ export const IntakeFormPage = () => {
     };
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-screen"><Loader2 className="animate-spin" size={32} /></div>;
+        return <div className="flex items-center justify-center min-h-screen"><BrandedLoader /></div>;
     }
 
     if (error) {
-        return <div className="flex items-center justify-center h-screen"><p className="text-red-500">{error}</p></div>;
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-primary-bg dark:bg-dark-primary-bg p-4 text-text-primary dark:text-dark-text-primary">
+                <Card className="text-center max-w-sm">
+                    <h1 className="text-2xl font-bold mb-2">Error</h1>
+                    <p className="text-text-secondary dark:text-dark-text-secondary mb-4">{error}</p>
+                    <button onClick={() => window.location.href = '/'} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90">
+                        Go to Home
+                    </button>
+                </Card>
+            </div>
+        );
     }
 
     if (isSuccess) {
         return (
-             <div className="flex items-center justify-center h-screen bg-primary-bg dark:bg-dark-primary-bg p-4">
-                <Card className="text-center">
+            <div className="flex items-center justify-center min-h-screen bg-primary-bg dark:bg-dark-primary-bg p-4 text-text-primary dark:text-dark-text-primary">
+                <Card className="text-center max-w-sm">
                     <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
                     <h1 className="text-2xl font-bold">Thank You!</h1>
                     <p className="text-text-secondary dark:text-dark-text-secondary mt-2">Your responses have been submitted successfully.</p>
@@ -97,7 +107,7 @@ export const IntakeFormPage = () => {
     
     return (
         <div className="min-h-screen bg-primary-bg dark:bg-dark-primary-bg p-4 md:p-8 flex flex-col items-center">
-            <header className="w-full max-w-2xl mb-8 flex items-center gap-2">
+            <header className="w-full max-w-2xl mb-8 flex items-center gap-4">
                 <AnimatedLogo />
                 <h1 className="text-2xl font-bold">Client Intake Form</h1>
             </header>
@@ -128,8 +138,8 @@ export const IntakeFormPage = () => {
                             />
                         </div>
                     ))}
-                     <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Submit Form'}
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
+                        {isSubmitting ? <BrandedLoader text="Submitting..." /> : 'Submit Form'}
                     </button>
                 </form>
             </Card>
@@ -137,5 +147,4 @@ export const IntakeFormPage = () => {
     );
 };
 
-// export default IntakeFormPage;
-
+export default IntakeFormPage;

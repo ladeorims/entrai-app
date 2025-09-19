@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { XCircle, Loader2, ArrowRight } from 'lucide-react';
 import Card from '../ui/Card';
+import { useAuth } from '../../AuthContext';
+import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} form-select`;
 
-export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
+export const TransferModal = ({ onClose, onTransferSuccess }) => {
+    const { token } = useAuth();
     const [transferData, setTransferData] = useState({
         amount: '',
         fromScope: 'business',
@@ -31,7 +34,7 @@ export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
         setErrorMessage('');
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/finance/transfer`, {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/transactions/transfer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(transferData)
@@ -55,7 +58,6 @@ export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
     
     const handleScopeChange = (field, value) => {
         const newTransferData = { ...transferData, [field]: value };
-        // Prevent from and to being the same
         if (field === 'fromScope' && value === newTransferData.toScope) {
             newTransferData.toScope = value === 'business' ? 'personal' : 'business';
         }
@@ -67,6 +69,15 @@ export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            {errorMessage && (
+                <CustomModal
+                    title="Error"
+                    message={errorMessage}
+                    type="error"
+                    confirmText="Okay"
+                    onConfirm={() => setErrorMessage('')}
+                />
+            )}
             <Card className="max-w-md w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Log a Transfer</h2>
@@ -92,14 +103,14 @@ export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
                             <option value="business">Business</option>
                         </select>
                     </div>
-                     <input 
+                    <input 
                         type="text" 
                         placeholder="Description (e.g., Owner's Draw)" 
                         value={transferData.description} 
                         onChange={e => setTransferData({...transferData, description: e.target.value})} 
                         className={formInputClasses} 
                     />
-                     <input 
+                    <input 
                         type="date" 
                         value={transferData.date} 
                         onChange={e => setTransferData({...transferData, date: e.target.value})} 
@@ -115,5 +126,3 @@ export const TransferModal = ({ token, onClose, onTransferSuccess }) => {
         </div>
     );
 };
-
-// export default TransferModal;

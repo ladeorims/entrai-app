@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import { KeyRound, Bell, Building2, Send, Loader2 } from 'lucide-react';
+import { useAuth } from '../AuthContext';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 
@@ -14,7 +15,9 @@ const ToggleSwitch = ({ isEnabled, onToggle, disabled = false }) => {
     );
 };
 
-const SettingsPage = ({ user, token }) => {
+
+const SettingsPage = () => {
+    const { user, token } = useAuth();    
     const [settings, setSettings] = useState({ weeklyPulseEnabled: user?.weeklyPulseEnabled || false });
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');

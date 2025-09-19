@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Target, DollarSign, Users, CheckCircle, Edit, Save, XCircle } from 'lucide-react';
 import Card from '../ui/Card';
+import { useAuth } from '../../AuthContext';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 
@@ -27,28 +28,31 @@ const GoalProgressBar = ({ title, icon, current, goal }) => {
     );
 };
 
-export const GoalsWidget = ({ token, dashboardData }) => {
+export const GoalsWidget = ({ dashboardData }) => {
+    const { token } = useAuth();
     const [goals, setGoals] = useState({ revenue_goal: 0, new_clients_goal: 0, deals_won_goal: 0 });
     const [isEditing, setIsEditing] = useState(false);
     const [editedGoals, setEditedGoals] = useState(goals);
 
-    useEffect(() => {
-        const fetchGoals = async () => {
-            try {
-                const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/goals`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setGoals(data);
-                    setEditedGoals(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch goals:", error);
+    const fetchGoals = useCallback(async () => {
+        if (!token) return;
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/goals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setGoals(data);
+                setEditedGoals(data);
             }
-        };
-        fetchGoals();
+        } catch (error) {
+            console.error("Failed to fetch goals:", error);
+        }
     }, [token]);
+
+    useEffect(() => {
+        fetchGoals();
+    }, [fetchGoals]);
 
     const handleSaveGoals = async () => {
         try {
@@ -83,8 +87,8 @@ export const GoalsWidget = ({ token, dashboardData }) => {
                 <h2 className="text-xl font-bold flex items-center gap-2"><Target /> Monthly Goals</h2>
                 {isEditing ? (
                     <div className="flex items-center gap-2">
-                         <button onClick={handleSaveGoals} className="text-green-500 hover:opacity-70"><Save size={20} /></button>
-                         <button onClick={() => { setIsEditing(false); setEditedGoals(goals); }} className="text-red-500 hover:opacity-70"><XCircle size={20} /></button>
+                        <button onClick={handleSaveGoals} className="text-green-500 hover:opacity-70"><Save size={20} /></button>
+                        <button onClick={() => { setIsEditing(false); setEditedGoals(goals); }} className="text-red-500 hover:opacity-70"><XCircle size={20} /></button>
                     </div>
                 ) : (
                     <button onClick={() => setIsEditing(true)} className="text-text-secondary dark:text-dark-text-secondary hover:text-accent-start dark:hover:text-dark-accent-mid"><Edit size={16} /></button>
@@ -121,7 +125,7 @@ export const GoalsWidget = ({ token, dashboardData }) => {
                             current={dashboardData?.metrics.newClientsThisMonth || 0}
                             goal={goals.new_clients_goal}
                         />
-                         <GoalProgressBar 
+                        <GoalProgressBar 
                             title="Deals Won"
                             icon={<CheckCircle size={16} className="text-purple-500"/>}
                             current={dashboardData?.metrics.dealsWonThisMonth || 0}
@@ -134,4 +138,4 @@ export const GoalsWidget = ({ token, dashboardData }) => {
     );
 };
 
-// export default GoalsWidget;
+export default GoalsWidget;

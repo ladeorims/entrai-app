@@ -5,13 +5,14 @@ import { CheckSquare, Calendar, Mail, FileText, Trash2, XCircle, PlusCircle, Loa
 import Card from '../components/ui/Card';
 import { AddTaskModal } from '../components/modals/AddTaskModal';
 import { SearchableClientDropdown } from '../components/ui/SearchableClientDropdown';
+import { useAuth } from '../AuthContext';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} form-select`;
 const formTextareaClasses = `${formInputClasses} h-24`;
 
-const VirtualAssistantDashboard = ({ token }) => {
-    const [currentTasks, setCurrentTasks] = useState([]);
+const VirtualAssistantDashboard = () => {
+    const { token } = useAuth();    const [currentTasks, setCurrentTasks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isCleanerModalVisible, setIsCleanerModalVisible] = useState(false);

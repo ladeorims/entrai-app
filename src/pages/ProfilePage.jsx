@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import Card from "../components/ui/Card";
 import { User, Mail, Star, Phone, LogOut, Save, XCircle, ArrowLeft, Image as ImageIcon } from "lucide-react";
-import UpgradeModal from '../components/UpgradeModal'; 
+import UpgradeModal from '../components/UpgradeModal';
+import { useAuth } from '../AuthContext';
 
 const formInputClasses = "w-full mt-1 bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formTextareaClasses = `${formInputClasses} h-auto`;
 
-const ProfilePage = ({ user, setUser, token, setActiveView, onSelectPlan }) => {
+const ProfilePage = () => {
+    const { user, setUser, token, setActiveView, onSelectPlan } = useAuth();    
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
     const [initials, setInitials] = useState("");

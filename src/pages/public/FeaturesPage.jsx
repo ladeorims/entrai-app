@@ -1,4 +1,3 @@
-// src/pages/public/FeaturesPage.jsx
 import React from 'react';
 import PublicLayout from './PublicLayout';
 import { Users, BarChart, Zap, Bot, ShieldCheck } from 'lucide-react';
@@ -14,15 +13,15 @@ const FeatureCard = ({ icon, title, children }) => (
     </Card>
 );
 
-const FeaturesPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
+const FeaturesPage = () => {
     return (
-        <PublicLayout activeView="Features" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
+        <PublicLayout>
             <div className="container mx-auto px-5 py-16 max-w-5xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Run your business on autopilot.</h1>
                 <p className="mt-4 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
                     Entruvi brings CRM, finance, marketing, and automation into one intelligent platform — so you spend less time on admin and more time on vision.
                 </p>
-                <button onClick={onStartTrial} className="mt-8 bg-gradient-to-r from-accent-start to-accent-end text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg hover:opacity-90">
+                <button className="mt-8 bg-gradient-to-r from-accent-start to-accent-end text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg hover:opacity-90">
                     Start Free Trial
                 </button>
             </div>

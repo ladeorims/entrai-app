@@ -1,12 +1,12 @@
-// src/components/modals/AskAIModal.jsx
-
 import React, { useState } from 'react';
 import { XCircle, Loader2, Wand2, Sparkles } from 'lucide-react';
 import Card from '../ui/Card';
+import { useAuth } from '../../AuthContext';
 
 const formTextareaClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary h-24";
 
-export const AskAIModal = ({ token, onClose }) => {
+export const AskAIModal = ({ onClose }) => {
+    const { token } = useAuth();
     const [prompt, setPrompt] = useState('');
     const [response, setResponse] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -64,5 +64,3 @@ export const AskAIModal = ({ token, onClose }) => {
         </div>
     );
 };
-
-// export default AskAIModal;

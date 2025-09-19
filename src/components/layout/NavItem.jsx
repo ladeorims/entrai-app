@@ -1,15 +1,20 @@
-// src/components/layout/NavItem.jsx
 import React from 'react';
-
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../AuthContext';
 // eslint-disable-next-line no-unused-vars
-const NavItem = ({ icon: Icon, label, view, activeView, isCollapsed, setActiveView }) => {
-    const isActive = activeView === view;
-    
-    const handleClick = () => {
-        if (view === 'Logout') {
-            setActiveView(); // This is the handleLogout function
+const NavItem = ({ icon: Icon, label, to, isCollapsed }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { handleLogout } = useAuth();
+
+    const isActive = location.pathname === to;
+
+    const handleClick = (e) => {
+        e.preventDefault();
+        if (label === 'Logout') {
+            handleLogout();
         } else {
-            setActiveView(view);
+            navigate(to);
         }
     };
 
@@ -25,7 +30,7 @@ const NavItem = ({ icon: Icon, label, view, activeView, isCollapsed, setActiveVi
                     }
                 `}
             >
-                <Icon size={20} />
+                <Icon size={20}/>
                 {!isCollapsed && <span className="ml-3 font-semibold">{label}</span>}
             </button>
         </li>

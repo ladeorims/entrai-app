@@ -8,6 +8,7 @@ import { ClientDealModal } from '../components/modals/ClientDealModal';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 import { AskAIModal } from '../components/modals/AskAIModal';
 import { GoalsWidget } from '../components/dashboard/GoalsWidget';
+import { useAuth } from '../AuthContext';
 
 const BusinessHealthGauge = ({ score }) => {
     const getStatus = (s) => {
@@ -48,7 +49,9 @@ const BusinessHealthGauge = ({ score }) => {
     );
 };
 
-const Dashboard = ({ token, user }) => {
+
+const Dashboard = () => {
+    const { token, user } = useAuth();
     const [dashboardData, setDashboardData] = useState(null);
     const [tasks, setTasks] = useState([]);
     const [activity, setActivity] = useState([]);

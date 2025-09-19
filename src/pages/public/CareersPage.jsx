@@ -1,5 +1,3 @@
-// src/pages/public/CareersPage.jsx
-
 import React from 'react';
 import PublicLayout from './PublicLayout';
 import Card from '../../components/ui/Card';
@@ -16,18 +14,18 @@ const JobCard = ({ title, location }) => (
     </Card>
 );
 
-const CareersPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
+const CareersPage = () => {
     const openRoles = [
         { title: 'Frontend Developer', location: 'Remote' },
         { title: 'Marketing Associate', location: 'Remote' },
         { title: 'Customer Success Lead', location: 'Remote' }
     ];
     return (
-        <PublicLayout activeView="Careers" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
+        <PublicLayout>
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Join us in building the future of work.</h1>
                 <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                   Entruvi is on a mission to free entrepreneurs from admin overload. We’re a remote-first, impact-driven, and passionate team looking for innovative thinkers to join us.
+                    Entruvi is on a mission to free entrepreneurs from admin overload. We’re a remote-first, impact-driven, and passionate team looking for innovative thinkers to join us.
                 </p>
             </div>
 

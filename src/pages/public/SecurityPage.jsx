@@ -1,5 +1,3 @@
-// src/pages/public/SecurityPage.jsx
-
 import React from 'react';
 import PublicLayout from './PublicLayout';
 import { ShieldCheck, DatabaseZap, Lock, KeyRound } from 'lucide-react';
@@ -15,9 +13,9 @@ const SecurityFeature = ({ icon, title, children }) => (
     </Card>
 );
 
-const SecurityPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
+const SecurityPage = () => {
     return (
-        <PublicLayout activeView="Security" setActiveView={setActiveView} onLaunchApp={onLaunchApp} onStartTrial={onStartTrial}>
+        <PublicLayout>
             <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
                 <h1 className="text-4xl md:text-6xl font-bold">Your business data, safeguarded.</h1>
                 <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
@@ -36,7 +34,7 @@ const SecurityPage = ({ setActiveView, onLaunchApp, onStartTrial }) => {
                     <SecurityFeature icon={<ShieldCheck size={28} className="text-green-500"/>} title="Stripe Compliance">
                         All payment information is handled by Stripe, a PCI-DSS compliant payment processor. We never store your credit card details.
                     </SecurityFeature>
-                     <SecurityFeature icon={<DatabaseZap size={28} className="text-green-500"/>} title="Secure Hosting">
+                    <SecurityFeature icon={<DatabaseZap size={28} className="text-green-500"/>} title="Secure Hosting">
                         Our infrastructure is hosted on Render and Vercel, platforms with world-class physical and network security.
                     </SecurityFeature>
                 </div>

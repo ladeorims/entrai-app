@@ -1,14 +1,16 @@
-// src/components/modals/CreateInvoiceModal.jsx
-
 import React, { useState } from 'react';
 import { XCircle, Loader2, Download, Send, Save } from 'lucide-react';
 import Card from '../ui/Card';
 import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
+import { useAuth } from '../../AuthContext';
+import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formTextareaClasses = `${formInputClasses} h-24`;
 
-export const CreateInvoiceModal = ({ token, user, clients, onClose, onInvoiceCreated }) => {
+export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
+    const { token, user } = useAuth();
+    
     const [newInvoice, setNewInvoice] = useState({ 
         client_id: '', 
         issue_date: new Date().toISOString().split('T')[0], 
@@ -19,6 +21,7 @@ export const CreateInvoiceModal = ({ token, user, clients, onClose, onInvoiceCre
     });
     const [actionStatus, setActionStatus] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const handleLineItemChange = (index, field, value) => {
         const items = [...newInvoice.lineItems];
@@ -44,7 +47,7 @@ export const CreateInvoiceModal = ({ token, user, clients, onClose, onInvoiceCre
 
     const handleInvoiceAction = async (action) => {
         if (!newInvoice.client_id) {
-            setActionStatus('Error: Please select a client.');
+            setErrorMessage('Error: Please select a client.');
             return;
         }
         setIsProcessing(true);
@@ -82,13 +85,22 @@ export const CreateInvoiceModal = ({ token, user, clients, onClose, onInvoiceCre
 
         } catch (error) { 
             console.error("Failed to process invoice:", error); 
-            setActionStatus(`Error: ${error.message}`);
+            setErrorMessage(`Error: ${error.message}`);
             setIsProcessing(false);
         }
     };
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            {errorMessage && (
+                <CustomModal
+                    title="Error"
+                    message={errorMessage}
+                    type="error"
+                    confirmText="Okay"
+                    onConfirm={() => setErrorMessage('')}
+                />
+            )}
             <Card className="max-w-3xl w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Create Invoice</h2>
@@ -136,5 +148,3 @@ export const CreateInvoiceModal = ({ token, user, clients, onClose, onInvoiceCre
         </div>
     );
 };
-
-// export default CreateInvoiceModal;

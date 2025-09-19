@@ -1,14 +1,15 @@
-// src/components/modals/ClientDealModal.jsx
-
 import React, { useState, useEffect } from 'react';
 import { XCircle, Save, Loader2, UserPlus, Users } from 'lucide-react';
 import Card from '../ui/Card';
 import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
+import { useAuth } from '../../AuthContext';
+import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const salesStages = ['New Leads', 'Contacted', 'Proposal Sent', 'Negotiation', 'Closed Won'];
 
-export const ClientDealModal = ({ token, clients, onClose, onSuccess, defaultToNewClient = false }) => {
+export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClient = false }) => {
+    const { token } = useAuth();
     const [isCreatingClient, setIsCreatingClient] = useState(defaultToNewClient);
     const [newDeal, setNewDeal] = useState({ name: '', value: '', stage: 'New Leads', client_id: '' });
     const [newClient, setNewClient] = useState({ name: '', email: '', phoneNumber: '', companyName: '' });
@@ -97,6 +98,15 @@ export const ClientDealModal = ({ token, clients, onClose, onSuccess, defaultToN
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            {errorMessage && (
+                <CustomModal
+                    title="Error"
+                    message={errorMessage}
+                    type="error"
+                    confirmText="Okay"
+                    onConfirm={() => setErrorMessage('')}
+                />
+            )}
             <Card className="max-w-xl w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Add New Deal</h2>
@@ -104,12 +114,14 @@ export const ClientDealModal = ({ token, clients, onClose, onSuccess, defaultToN
                 </div>
                 <div className="flex justify-center mb-4">
                     <button 
+                        type="button"
                         onClick={() => { setIsCreatingClient(true); setClientCheck({ checked: false, exists: false, message: '' }); }} 
                         className={`px-4 py-2 text-sm font-semibold rounded-l-lg transition-all flex items-center gap-2 ${isCreatingClient ? 'bg-gradient-to-r from-accent-start to-accent-end text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700 text-text-secondary dark:text-dark-text-secondary'}`}
                     >
                         <UserPlus size={16}/> Create New Client
                     </button>
                     <button 
+                        type="button"
                         onClick={() => setIsCreatingClient(false)} 
                         className={`px-4 py-2 text-sm font-semibold rounded-r-lg transition-all flex items-center gap-2 ${!isCreatingClient ? 'bg-gradient-to-r from-accent-start to-accent-end text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700 text-text-secondary dark:text-dark-text-secondary'}`}
                     >
@@ -163,5 +175,3 @@ export const ClientDealModal = ({ token, clients, onClose, onSuccess, defaultToN
         </div>
     );
 };
-
-// export default ClientDealModal;
