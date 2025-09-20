@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2 } from 'lucide-react';
+import { XCircle, Save } from 'lucide-react';
 import Card from '../ui/Card';
 import { useAuth } from '../../AuthContext';
+import BrandedLoader from '../BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
-const formSelectClasses = `${formInputClasses} form-select`;
 
 export const EditTransactionModal = ({ transaction, onClose, onUpdate }) => {
     const { token } = useAuth();
@@ -20,11 +20,23 @@ export const EditTransactionModal = ({ transaction, onClose, onUpdate }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const validateForm = () => {
+        if (!formData.title.trim() || !formData.amount.trim() || !formData.category.trim() || !formData.transaction_date) {
+            setErrorMessage('All fields are required.');
+            return false;
+        }
+        return true;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
         setErrorMessage('');
 
+        if (!validateForm()) {
+            return;
+        }
+
+        setIsLoading(true);
         try {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/transactions/${transaction.id}`, {
                 method: 'PUT',
@@ -54,6 +66,7 @@ export const EditTransactionModal = ({ transaction, onClose, onUpdate }) => {
                     <h2 className="text-xl font-semibold">Edit Transaction</h2>
                     <button onClick={onClose}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70" /></button>
                 </div>
+                {errorMessage && <p className="text-sm text-red-500 text-center mb-4">{errorMessage}</p>}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
@@ -77,7 +90,7 @@ export const EditTransactionModal = ({ transaction, onClose, onUpdate }) => {
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
-                        className={formSelectClasses}
+                        className={`${formInputClasses} form-select`}
                     >
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
@@ -103,9 +116,8 @@ export const EditTransactionModal = ({ transaction, onClose, onUpdate }) => {
                         className={formInputClasses}
                         required
                     />
-                    {errorMessage && <p className="text-sm text-red-500 text-center">{errorMessage}</p>}
                     <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Save Changes'}
+                        {isLoading ? <BrandedLoader text="Saving..." /> : 'Save Changes'}
                     </button>
                 </form>
             </Card>

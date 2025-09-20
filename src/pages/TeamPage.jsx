@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../AuthContext';
 import Card from '../components/ui/Card';
 import CustomModal from '../components/ui/CustomModal';
-import { UserPlus, Mail, XCircle, Loader2, User, Send } from 'lucide-react';
+import { UserPlus, Mail, XCircle, Loader2, User, Send, Trash2 } from 'lucide-react';
 import BrandedLoader from '../components/BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
@@ -13,6 +13,9 @@ const TeamPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [inviteData, setInviteData] = useState({ name: '', email: '' });
     const [modalState, setModalState] = useState({ isOpen: false, type: '', title: '', message: '' });
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [memberToKick, setMemberToKick] = useState(null);
+    const [isKicking, setIsKicking] = useState(false);
 
     const fetchTeamMembers = useCallback(async () => {
         if (!token) return;
@@ -57,6 +60,33 @@ const TeamPage = () => {
             setIsLoading(false);
         }
     };
+    
+    const confirmKickMember = (member) => {
+        setMemberToKick(member);
+        setShowDeleteConfirmation(true);
+    };
+
+    const handleKickMember = async () => {
+        if (!memberToKick) return;
+        setIsKicking(true);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/team/kick`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ memberId: memberToKick.id }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            setModalState({ isOpen: true, type: 'success', title: 'Success', message: data.message });
+            setShowDeleteConfirmation(false);
+            setMemberToKick(null);
+            fetchTeamMembers();
+        } catch (error) {
+            setModalState({ isOpen: true, type: 'error', title: 'Error', message: error.message });
+        } finally {
+            setIsKicking(false);
+        }
+    };
 
     if (user?.planType !== 'team') {
         return (
@@ -84,6 +114,16 @@ const TeamPage = () => {
                     onConfirm={() => setModalState({ ...modalState, isOpen: false })}
                 />
             )}
+            {showDeleteConfirmation && (
+                <CustomModal
+                    title="Confirm Removal"
+                    message={isKicking ? "Removing team member..." : `Are you sure you want to remove ${memberToKick.name} from the team?`}
+                    type="confirm"
+                    confirmText="Remove"
+                    onConfirm={handleKickMember}
+                    onClose={() => setShowDeleteConfirmation(false)}
+                />
+            )}
             <header>
                 <h1 className="text-3xl font-bold">Team Management</h1>
                 <p className="text-text-secondary dark:text-dark-text-secondary mt-1">Invite and manage your team members on the Enterprise plan.</p>
@@ -101,6 +141,9 @@ const TeamPage = () => {
                                         <h3 className="font-semibold">{member.name}</h3>
                                         <p className="text-sm text-text-secondary dark:text-dark-text-secondary">{member.email}</p>
                                     </div>
+                                    <button onClick={() => confirmKickMember(member)} className="ml-auto text-red-500 hover:opacity-70 disabled:opacity-50" disabled={user.email === member.email}>
+                                        <Trash2 size={18} />
+                                    </button>
                                 </li>
                             ))}
                         </ul>
@@ -131,7 +174,7 @@ const TeamPage = () => {
                                 disabled={isLoading}
                                 className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50"
                             >
-                                {isLoading ? <Loader2 className="animate-spin" /> : <><Send size={16} className="mr-2" /> Send Invitation</>}
+                                {isLoading ? <BrandedLoader text="Sending..." /> : <><Send size={16} className="mr-2" /> Send Invitation</>}
                             </button>
                         </form>
                     </Card>

@@ -1,6 +1,5 @@
-// src/pages/ProfilePage.jsx
-
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import { User, Mail, Star, Phone, LogOut, Save, XCircle, ArrowLeft, Image as ImageIcon } from "lucide-react";
 import UpgradeModal from '../components/UpgradeModal';
@@ -10,7 +9,7 @@ const formInputClasses = "w-full mt-1 bg-slate-100 dark:bg-dark-primary-bg borde
 const formTextareaClasses = `${formInputClasses} h-auto`;
 
 const ProfilePage = () => {
-    const { user, setUser, token, setActiveView, onSelectPlan } = useAuth();    
+    const { user, setUser, token, handleLogout } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
     const [initials, setInitials] = useState("");
@@ -18,6 +17,7 @@ const ProfilePage = () => {
     const logoInputRef = useRef(null);
     const [updateMessage, setUpdateMessage] = useState({ type: '', text: '' });
     const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (user) {
@@ -34,6 +34,12 @@ const ProfilePage = () => {
     const handleSaveProfile = async () => {
         if (!token) return;
         setUpdateMessage({ type: '', text: '' });
+
+        // --- NEW: Basic client-side validation ---
+        if (!formData.name || !formData.company) {
+            setUpdateMessage({ type: 'error', text: 'Name and Company Name are required.' });
+            return;
+        }
 
         try {
             const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile`, {
@@ -58,11 +64,6 @@ const ProfilePage = () => {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        window.location.reload();
-    };
-
     const handlePictureUpload = (e, fieldName) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -76,10 +77,10 @@ const ProfilePage = () => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {isUpgradeModalVisible && <UpgradeModal onSelectPlan={onSelectPlan} onClose={() => setIsUpgradeModalVisible(false)} />}
+            {isUpgradeModalVisible && <UpgradeModal onClose={() => setIsUpgradeModalVisible(false)} />}
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setActiveView('Dashboard')} className="bg-slate-200 dark:bg-slate-700 p-2 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                    <button onClick={() => navigate('/dashboard')} className="bg-slate-200 dark:bg-slate-700 p-2 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
                         <ArrowLeft size={20} />
                     </button>
                     <div>
@@ -126,7 +127,7 @@ const ProfilePage = () => {
                                 <p className="font-semibold">{formData.email || "..."}</p>
                             </div>
                         </div>
-                         <div className="flex items-start gap-4">
+                        <div className="flex items-start gap-4">
                             <Phone size={20} className="text-text-secondary dark:text-dark-text-secondary mt-1" />
                             <div>
                                 <p className="text-sm text-text-secondary dark:text-dark-text-secondary">Phone Number</p>
@@ -148,7 +149,7 @@ const ProfilePage = () => {
                         <div className="space-y-6">
                             <div>
                                 <label className="block text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-2">Company Logo</label>
-                                {formData.companyLogoUrl ? (<img src={formData.companyLogoUrl} alt="Company Logo" className="h-12 bg-slate-100 dark:bg-dark-primary-bg p-2 rounded-lg object-contain mb-2"/>) : (<div className="h-12 w-40 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-center mb-2"><ImageIcon className="text-text-secondary dark:text-dark-text-secondary"/></div>)}
+                                {formData.companyLogoUrl ? (<img src={formData.companyLogoUrl} alt="Company Logo" className="h-12 bg-slate-100 dark:bg-dark-primary-bg p-2 rounded-lg object-contain mb-2" />) : (<div className="h-12 w-40 bg-slate-100 dark:bg-dark-primary-bg rounded-lg flex items-center justify-center mb-2"><ImageIcon className="text-text-secondary dark:text-dark-text-secondary" /></div>)}
                                 <input type="file" ref={logoInputRef} onChange={(e) => handlePictureUpload(e, 'companyLogoUrl')} className="hidden" accept="image/*" />
                                 {isEditing && (<button onClick={() => logoInputRef.current.click()} className="text-sm font-semibold text-accent-start dark:text-dark-accent-mid hover:opacity-80">Upload new logo</button>)}
                             </div>
@@ -156,17 +157,17 @@ const ProfilePage = () => {
                                 <label className="block text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-1">Company Name</label>
                                 {isEditing ? (<input type="text" name="company" value={formData.company || ''} onChange={handleChange} className={formInputClasses} />) : (<p className="font-semibold">{formData.company || "Not specified"}</p>)}
                             </div>
-                             <div>
+                            <div>
                                 <label className="block text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-1">Address</label>
                                 {isEditing ? (<input type="text" name="address" value={formData.address || ''} onChange={handleChange} className={formInputClasses} />) : (<p className="font-semibold">{formData.address || "Not specified"}</p>)}
                             </div>
-                             <div>
+                            <div>
                                 <label className="block text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-1">City, Province, Postal Code</label>
-                                {isEditing ? (<input type="text" name="city_province_postal" value={formData.city_province_postal || ''} onChange={handleChange} className={formInputClasses} />) : (<p className="font-semibold">{formData.city_province_postal || "Not specified"}</p>)}
+                                {isEditing ? (<input type="text" name="cityProvincePostal" value={formData.cityProvincePostal || ''} onChange={handleChange} className={formInputClasses} />) : (<p className="font-semibold">{formData.cityProvincePostal || "Not specified"}</p>)}
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-1">About Your Company</label>
-                                {isEditing ? (<textarea name="companyDescription" value={formData.companyDescription || ""} onChange={handleChange} rows="5" className={formTextareaClasses} placeholder="Describe your business here..."/>) : (<p className="text-text-secondary dark:text-dark-text-secondary">{formData.companyDescription || "Not specified"}</p>)}
+                                {isEditing ? (<textarea name="companyDescription" value={formData.companyDescription || ""} onChange={handleChange} rows="5" className={formTextareaClasses} placeholder="Describe your business here..." />) : (<p className="text-text-secondary dark:text-dark-text-secondary">{formData.companyDescription || "Not specified"}</p>)}
                             </div>
                         </div>
                     </Card>
@@ -182,7 +183,7 @@ const ProfilePage = () => {
                         <p className="text-text-secondary dark:text-dark-text-secondary">
                             Your current plan details and features.
                         </p>
-                        {user?.planType !== 'team' && ( // Show upgrade button if not on the highest plan
+                        {user?.planType !== 'team' && (
                             <button onClick={() => setIsUpgradeModalVisible(true)} className="w-full mt-6 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white font-semibold px-4 py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90">
                                 <Star size={16} /> Upgrade Plan
                             </button>

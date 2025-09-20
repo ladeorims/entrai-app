@@ -5,6 +5,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import BrandedLoader from '../components/BrandedLoader';
 
+// This is the consistent form input style definition
+const formInputClasses = "w-full p-3 bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
+
 const ResetPasswordPage = () => {
     const [token, setToken] = useState('');
     const [password, setPassword] = useState('');
@@ -14,6 +17,9 @@ const ResetPasswordPage = () => {
     const { setAuthMessage } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Re-use the strong password regex from the backend logic
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{12,})/;
 
     useEffect(() => {
         const urlParams = new URLSearchParams(location.search);
@@ -27,12 +33,20 @@ const ResetPasswordPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setMessage({ type: '', text: '' });
+
         if (password !== confirmPassword) {
             setMessage({ type: 'error', text: 'Passwords do not match.' });
             return;
         }
+
+        // --- NEW: Client-side password complexity validation ---
+        if (!strongPasswordRegex.test(password)) {
+            setMessage({ type: 'error', text: 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.' });
+            return;
+        }
+
         setIsLoading(true);
-        setMessage({ type: '', text: '' });
         try {
             const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reset-password`, {
                 method: 'POST',
@@ -41,6 +55,8 @@ const ResetPasswordPage = () => {
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.message);
+            
+            // Set success message on the main Auth page
             setAuthMessage({ type: 'success', text: result.message });
             navigate('/auth');
         } catch (err) {
@@ -77,11 +93,11 @@ const ResetPasswordPage = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="relative">
                         <KeyRound size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="password" placeholder="New Password" value={password} onChange={e => setPassword(e.target.value)} className="form-input w-full pl-10" required />
+                        <input type="password" placeholder="New Password" value={password} onChange={e => setPassword(e.target.value)} className={`${formInputClasses} pl-10`} required />
                     </div>
                     <div className="relative">
                         <KeyRound size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="form-input w-full pl-10" required />
+                        <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={`${formInputClasses} pl-10`} required />
                     </div>
                     <button type="submit" disabled={isLoading || !token} className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
                         {isLoading ? <BrandedLoader text="Resetting..." /> : 'Reset Password'}

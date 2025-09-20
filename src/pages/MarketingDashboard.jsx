@@ -3,10 +3,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Megaphone, PlusCircle, Wand2, XCircle, Loader2, Copy } from 'lucide-react';
+import { Megaphone, PlusCircle, Wand2, XCircle, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 import { useAuth } from '../AuthContext';
+import BrandedLoader from '../components/BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formSelectClasses = `${formInputClasses} form-select`;
@@ -14,13 +15,13 @@ const formTextareaClasses = `${formInputClasses} h-24`;
 
 
 const MarketingDashboard = () => {
-    const { token } = useAuth();    const [summary, setSummary] = useState({ metrics: {}, campaigns: [] });
+    const { token } = useAuth();
+    const [summary, setSummary] = useState({ metrics: {}, campaigns: [] });
     const [content, setContent] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCampaignModalVisible, setIsCampaignModalVisible] = useState(false);
-    // const [newCampaign, setNewCampaign] = useState({ name: '', platform: 'Facebook', ad_spend: '', reach: '', engagement: '', conversions: '', start_date: new Date().toISOString().split('T')[0] });
     const [isContentModalVisible, setIsContentModalVisible] = useState(false);
-    const [newContent, setNewContent] = useState({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0] });
+    const [newContent, setNewContent] = useState({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0], is_scheduled: false, scheduled_date: null });
     const [isAiModalVisible, setIsAiModalVisible] = useState(false);
     const [aiState, setAiState] = useState({ topic: '', tone: 'professional', idea: '', isLoading: false });
 
@@ -46,14 +47,14 @@ const MarketingDashboard = () => {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleAddContent = async (e) => {
-        e.preventDefault();
-        try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
-            setIsContentModalVisible(false);
-            setNewContent({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0] });
-            fetchData();
-        } catch (error) { console.error("Failed to add content:", error); }
-    };
+        e.preventDefault();
+        try {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/content-calendar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newContent) });
+            setIsContentModalVisible(false);
+            setNewContent({ post_text: '', platform: 'Instagram', status: 'draft', post_date: new Date().toISOString().split('T')[0], is_scheduled: false, scheduled_date: null });
+            fetchData();
+        } catch (error) { console.error("Failed to add content:", error); }
+    };
 
     const handleGenerateIdea = async () => {
         if (!aiState.topic) return;
@@ -73,7 +74,7 @@ const MarketingDashboard = () => {
         navigator.clipboard.writeText(text);
     };
 
-    if (isLoading) { return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent-start" size={32} /></div>; }
+    if (isLoading) { return <div className="flex items-center justify-center h-full"><BrandedLoader /></div>; }
 
     return (
         <div className="space-y-8 animate-fade-in">
@@ -84,17 +85,41 @@ const MarketingDashboard = () => {
                     <Card className="max-w-lg w-full">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold">New Content</h2>
-                            <button onClick={() => setIsContentModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/></button>
+                            <button onClick={() => setIsContentModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70" /></button>
                         </div>
                         <form onSubmit={handleAddContent} className="space-y-4">
-                            <textarea placeholder="Post text..." onChange={e => setNewContent({...newContent, post_text: e.target.value})} className={formTextareaClasses} rows="5" required/>
-                            <select onChange={e => setNewContent({...newContent, platform: e.target.value})} className={formSelectClasses}>
+                            <textarea placeholder="Post text..." onChange={e => setNewContent({ ...newContent, post_text: e.target.value })} className={formTextareaClasses} rows="5" required />
+                            <select onChange={e => setNewContent({ ...newContent, platform: e.target.value })} className={formSelectClasses}>
                                 <option>Instagram</option>
                                 <option>Facebook</option>
                                 <option>LinkedIn</option>
                                 <option>Blog</option>
                             </select>
-                            <input type="date" defaultValue={new Date().toISOString().split('T')[0]} onChange={e => setNewContent({...newContent, post_date: e.target.value})} className={formSelectClasses} required/>
+                            
+                            {/* NEW: Scheduling options */}
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="isScheduled"
+                                    checked={newContent.is_scheduled}
+                                    onChange={e => setNewContent(p => ({ ...p, is_scheduled: e.target.checked, status: e.target.checked ? 'scheduled' : 'draft' }))}
+                                    className="h-4 w-4 rounded border-gray-300 text-accent-start dark:text-dark-accent-mid focus:ring-accent-start"
+                                />
+                                <label htmlFor="isScheduled" className="text-sm">Schedule this post</label>
+                            </div>
+
+                            {newContent.is_scheduled ? (
+                                <input
+                                    type="datetime-local"
+                                    value={newContent.scheduled_date ? new Date(newContent.scheduled_date).toISOString().slice(0, 16) : ''}
+                                    onChange={e => setNewContent(p => ({ ...p, scheduled_date: e.target.value ? new Date(e.target.value).toISOString() : null }))}
+                                    className={formInputClasses}
+                                    required
+                                />
+                            ) : (
+                                <input type="date" defaultValue={new Date().toISOString().split('T')[0]} onChange={e => setNewContent({ ...newContent, post_date: e.target.value })} className={formInputClasses} required />
+                            )}
+                            
                             <button type="submit" className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold hover:opacity-90">Save to Calendar</button>
                         </form>
                     </Card>
@@ -105,24 +130,24 @@ const MarketingDashboard = () => {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <Card className="max-w-2xl w-full">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold flex items-center gap-2"><Wand2 className="text-accent-start dark:text-dark-accent-mid"/> Generate Post Caption</h2>
-                            <button onClick={() => setIsAiModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/></button>
+                            <h2 className="text-xl font-semibold flex items-center gap-2"><Wand2 className="text-accent-start dark:text-dark-accent-mid" /> Generate Post Caption</h2>
+                            <button onClick={() => setIsAiModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70" /></button>
                         </div>
                         <div className="space-y-4">
-                            <textarea placeholder="What is the post about?" onChange={e => setAiState({...aiState, topic: e.target.value})} rows="3" className={formTextareaClasses}/>
-                            <select onChange={e => setAiState({...aiState, tone: e.target.value})} className={formSelectClasses}>
+                            <textarea placeholder="What is the post about?" onChange={e => setAiState({ ...aiState, topic: e.target.value })} rows="3" className={formTextareaClasses} />
+                            <select onChange={e => setAiState({ ...aiState, tone: e.target.value })} className={formSelectClasses}>
                                 <option value="professional">Professional</option>
                                 <option value="casual">Casual</option>
                                 <option value="salesy">Salesy</option>
                                 <option value="witty">Witty</option>
                             </select>
                             <button onClick={handleGenerateIdea} disabled={aiState.isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold flex items-center justify-center hover:opacity-90 disabled:opacity-50">
-                                {aiState.isLoading ? <Loader2 className="animate-spin"/> : "Generate"}
+                                {aiState.isLoading ? <BrandedLoader text="Generating..." /> : "Generate"}
                             </button>
-                            {aiState.idea && 
+                            {aiState.idea &&
                                 <div className="bg-slate-100 dark:bg-dark-primary-bg p-4 rounded-lg relative">
                                     <p className="whitespace-pre-wrap">{aiState.idea}</p>
-                                    <button onClick={() => copyToClipboard(aiState.idea)} className="absolute top-2 right-2 p-1 text-text-secondary dark:text-dark-text-secondary hover:opacity-70"><Copy size={16}/></button>
+                                    <button onClick={() => copyToClipboard(aiState.idea)} className="absolute top-2 right-2 p-1 text-text-secondary dark:text-dark-text-secondary hover:opacity-70"><Copy size={16} /></button>
                                 </div>
                             }
                         </div>
@@ -131,19 +156,19 @@ const MarketingDashboard = () => {
             )}
 
             <header className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold">Marketing Suite</h1>
-                    <p className="text-text-secondary dark:text-dark-text-secondary mt-1">Manage campaigns, content, and analytics.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setIsAiModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center gap-2">
-                        <Wand2 size={16} /> AI Post Idea
-                    </button>
-                    <button onClick={() => setIsCampaignModalVisible(true)} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
-                        <PlusCircle size={16} /> New Campaign
-                    </button>
-                </div>
-            </header>
+                <div>
+                    <h1 className="text-3xl font-bold">Marketing Suite</h1>
+                    <p className="text-text-secondary dark:text-dark-text-secondary mt-1">Manage campaigns, content, and analytics.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => setIsAiModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center gap-2">
+                        <Wand2 size={16} /> AI Post Idea
+                    </button>
+                    <button onClick={() => setIsCampaignModalVisible(true)} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
+                        <PlusCircle size={16} /> New Campaign
+                    </button>
+                </div>
+            </header>
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -161,10 +186,10 @@ const MarketingDashboard = () => {
                             <BarChart data={summary.campaigns}>
                                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                                 <XAxis dataKey="name" stroke="currentColor" className="text-xs text-text-secondary dark:text-dark-text-secondary" />
-                                <YAxis yAxisId="left" orientation="left" stroke="#4A90E2" className="text-xs text-text-secondary dark:text-dark-text-secondary" />
-                                <YAxis yAxisId="right" orientation="right" stroke="#00F2A9" className="text-xs text-text-secondary dark:text-dark-text-secondary" />
-                                <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg, #FFFFFF)', border: '1px solid #e2e8f0' }} itemStyle={{ color: 'var(--text-primary, #1E2022)' }}/>
-                                <Legend wrapperStyle={{fontSize: "0.875rem"}}/>
+                                <YAxis yAxisId="left" orientation="left" stroke="#9013FE" className="text-xs text-text-secondary dark:text-dark-text-secondary" />
+                                <YAxis yAxisId="right" orientation="right" stroke="#4A90E2" className="text-xs text-text-secondary dark:text-dark-text-secondary" />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg, #FFFFFF)', border: '1px solid #e2e8f0' }} itemStyle={{ color: 'var(--text-primary, #1E2022)' }} />
+                                <Legend wrapperStyle={{ fontSize: "0.875rem" }} />
                                 <Bar yAxisId="left" dataKey="engagement" fill="#9013FE" name="Engagement" />
                                 <Bar yAxisId="right" dataKey="reach" fill="#4A90E2" name="Reach" />
                             </BarChart>

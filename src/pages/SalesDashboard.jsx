@@ -1,59 +1,18 @@
-// /* eslint-disable no-irregular-whitespace */
+// src/pages/SalesDashboard.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { PlusCircle, Edit, Trash2, XCircle, Save, Bot, Loader2, Wand2, Mail, Users, CheckCircle, FileText, ChevronLeft, ChevronRight, Sparkles, FileSignature } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, XCircle, Save, Bot, Wand2, Mail, Users, CheckCircle, FileText, ChevronLeft, ChevronRight, Sparkles, FileSignature } from 'lucide-react';
 import Card from "../components/ui/Card";
 import { ClientDealModal } from '../components/modals/ClientDealModal';
 import { IntakeFormModal } from '../components/modals/IntakeFormModal';
 import { useAuth } from '../AuthContext';
 import BrandedLoader from '../components/BrandedLoader';
 import CustomModal from '../components/ui/CustomModal';
+import SmartPromptModal from '../components/sales/SmartPromptModal';
+import AiSalesModal from '../components/sales/AiSalesModal';
 
 const salesStages = ['New Leads', 'Contacted', 'Proposal Sent', 'Negotiation', 'Closed Won'];
-
-const SmartPromptModal = ({ deal, actions, onAction, onClose, successMessage }) => {
-    const navigate = useNavigate();
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <Card className="max-w-md w-full text-center">
-                <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end rounded-full flex items-center justify-center">
-                        <Sparkles size={32} className="text-white"/>
-                    </div>
-                </div>
-                
-                {successMessage ? (
-                    <div>
-                        <h2 className="text-xl font-bold mb-2 text-green-500">Success!</h2>
-                        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">{successMessage.text}</p>
-                        <button onClick={() => { navigate(`/${successMessage.view.toLowerCase().replace(' ', '-')}`); onClose(); }} className="w-full bg-slate-100 dark:bg-dark-primary-bg hover:bg-slate-200 dark:hover:bg-slate-800 p-3 rounded-lg font-semibold">
-                           {successMessage.buttonLabel}
-                        </button>
-                        <button onClick={onClose} className="mt-4 text-sm font-semibold text-text-secondary dark:text-dark-text-secondary hover:opacity-80">
-                            Close
-                        </button>
-                    </div>
-                ) : (
-                    <div>
-                        <h2 className="text-xl font-bold mb-2">Deal Won! What's next?</h2>
-                        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">You've closed the deal for <span className="font-semibold text-text-primary dark:text-dark-text-primary">{deal.name}</span>. Let's keep the momentum going.</p>
-                        <div className="space-y-3">
-                            {actions.map(action => (
-                                <button key={action.type} onClick={() => onAction(action.type, deal)} className="w-full bg-slate-100 dark:bg-dark-primary-bg hover:bg-slate-200 dark:hover:bg-slate-800 p-3 rounded-lg font-semibold text-left">
-                                   {action.label}
-                                </button>
-                            ))}
-                        </div>
-                        <button onClick={onClose} className="mt-6 text-sm font-semibold text-text-secondary dark:text-dark-text-secondary hover:opacity-80">
-                            I'll do this later
-                        </button>
-                    </div>
-                )}
-            </Card>
-        </div>
-    );
-};
 
 const SalesDashboard = () => {
     const { token } = useAuth();
@@ -76,7 +35,6 @@ const SalesDashboard = () => {
     const [intakeForm, setIntakeForm] = useState(null);
     const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
     const [dealToDelete, setDealToDelete] = useState(null);
-
 
     const fetchSalesData = useCallback(async () => {
         if (!token) { setLoading(false); return; }
@@ -195,60 +153,6 @@ const SalesDashboard = () => {
         else if (type === 'closing') title = 'Draft Closing Email';
         setAiModalState({ type, title, selectedDeal: null, generatedContent: '', aiEmailType: 'outreach', isLoading: false, saveStatus: '', sendStatus: '' });
         setIsAiModalVisible(true);
-    };
-
-    const handleAiDealSelect = (dealId) => {
-        const deal = Object.values(salesPipeline).flat().find(d => d.id === parseInt(dealId));
-        setAiModalState(prev => ({ ...prev, selectedDeal: deal, generatedContent: '', saveStatus: '', sendStatus: '' }));
-    };
-
-    const handleGenerateAiContent = async () => {
-        if (aiModalState.type !== 'leads' && !aiModalState.selectedDeal) { setAiModalState(prev => ({ ...prev, generatedContent: 'Please select a deal first.' })); return; }
-        setAiModalState(prev => ({ ...prev, isLoading: true, generatedContent: '', saveStatus: '' }));
-        let endpoint = '';
-        const body = { clientName: aiModalState.selectedDeal?.client_name, clientCompany: aiModalState.selectedDeal?.client_company };
-        if (aiModalState.type === 'email') { endpoint = 'generate-email'; body.emailType = aiModalState.aiEmailType; } 
-        else if (aiModalState.type === 'leads') { endpoint = 'generate-leads'; } 
-        else if (aiModalState.type === 'closing') { endpoint = 'generate-email'; body.emailType = 'closing-sequence'; }
-        try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ai/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
-            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
-            const result = await response.json();
-            if (aiModalState.type === 'leads') { setAiModalState(prev => ({ ...prev, generatedContent: result.leads.join('\n'), isLoading: false })); } 
-            else { setAiModalState(prev => ({ ...prev, generatedContent: result.emailContent, isLoading: false })); }
-        } catch (error) {
-            console.error('AI content generation error:', error);
-            setAiModalState(prev => ({ ...prev, generatedContent: `Failed to connect to the AI service. Error: ${error.message}`, isLoading: false }));
-        }
-    };
-
-    const handleSaveAiContent = async () => {
-        const dealId = aiModalState.selectedDeal?.id;
-        if (!dealId) { setAiModalState(prev => ({...prev, saveStatus: 'Error: No deal selected.'})); return; }
-        setAiModalState(prev => ({...prev, saveStatus: 'Saving...'}));
-        try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/deals/${dealId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ note: aiModalState.generatedContent, type: aiModalState.type }) });
-            if (!response.ok) throw new Error('Failed to save note.');
-            setAiModalState(prev => ({...prev, saveStatus: 'Saved successfully!'}));
-        } catch (error) {
-            console.error('Save AI content error:', error);
-            setAiModalState(prev => ({...prev, saveStatus: `Error: ${error.message}`}));
-        }
-    };
-
-    const handleSendAiEmail = async () => {
-        const deal = aiModalState.selectedDeal;
-        if (!deal) { setAiModalState(prev => ({ ...prev, sendStatus: 'Error: No deal selected.' })); return; }
-        setAiModalState(prev => ({ ...prev, sendStatus: 'Sending email...' }));
-        const emailSubject = `${aiModalState.title.replace('Generate ', '')} for ${deal.name}`;
-        try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ clientEmail: deal.client_email, subject: emailSubject, body: aiModalState.generatedContent, clientId: deal.client_id }) });
-            if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || 'Failed to send email.'); }
-            setAiModalState(prev => ({ ...prev, sendStatus: 'Email sent successfully!' }));
-        } catch (error) {
-            console.error('Error sending email:', error);
-            setAiModalState(prev => ({ ...prev, sendStatus: `Error sending email: ${error.message}` }));
-        }
     };
 
     const handleDrop = async (e, targetStage) => {
@@ -392,87 +296,13 @@ const SalesDashboard = () => {
             )}
             
             {isAiModalVisible && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <Card className="max-w-3xl w-full">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold flex items-center gap-2">
-                                <Wand2 size={24} className="text-accent-start dark:text-dark-accent-mid" /> 
-                                {aiModalState.title}
-                            </h2>
-                            <button onClick={() => setIsAiModalVisible(false)}>
-                                <XCircle size={24} className="text-text-secondary dark:text-dark-text-secondary hover:opacity-70"/>
-                            </button>
-                        </div>
-                        
-                        {aiModalState.isLoading ? (
-                            <div className="flex items-center justify-center h-64">
-                                <BrandedLoader text="Generating..." />
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {aiModalState.type !== 'leads' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">Select a Deal for Context</label>
-                                        <select onChange={(e) => handleAiDealSelect(e.target.value)} defaultValue="" className="w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start">
-                                            <option value="" disabled>Choose a deal...</option>
-                                            {Object.values(salesPipeline).flat().map(deal => (
-                                                <option key={deal.id} value={deal.id}>{deal.name} - ${parseFloat(deal.value).toLocaleString()}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                
-                                {aiModalState.type === 'email' && (
-                                    <div className="flex justify-start gap-4 flex-wrap">
-                                        <label className="text-sm">
-                                            <input type="radio" value="outreach" checked={aiModalState.aiEmailType === 'outreach'} onChange={(e) => setAiModalState(prev => ({...prev, aiEmailType: e.target.value, generatedContent: ''}))} className="mr-2 accent-accent-start dark:accent-dark-accent-mid" />
-                                            Outreach
-                                        </label>
-                                        <label className="text-sm">
-                                            <input type="radio" value="follow-up" checked={aiModalState.aiEmailType === 'follow-up'} onChange={(e) => setAiModalState(prev => ({...prev, aiEmailType: e.target.value, generatedContent: ''}))} className="mr-2 accent-accent-start dark:accent-dark-accent-mid" />
-                                            Follow-up
-                                        </label>
-                                        <label className="text-sm">
-                                            <input type="radio" value="value-added" checked={aiModalState.aiEmailType === 'value-added'} onChange={(e) => setAiModalState(prev => ({...prev, aiEmailType: e.target.value, generatedContent: ''}))} className="mr-2 accent-accent-start dark:accent-dark-accent-mid" />
-                                            Value-added
-                                        </label>
-                                    </div>
-                                )}
-                                
-                                {aiModalState.generatedContent ? (
-                                    <>
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">Review & Edit</label>
-                                            <textarea 
-                                                value={aiModalState.generatedContent}
-                                                onChange={(e) => setAiModalState({...aiModalState, generatedContent: e.target.value})}
-                                                rows="10"
-                                                className="w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start"
-                                            />
-                                            <p className="text-xs text-text-secondary dark:text-dark-text-secondary text-center mt-3">✨ AI-generated content. Please review for accuracy and tone.</p>
-                                        </div>
-                                        <div className="mt-4 flex gap-2">
-                                            {aiModalState.type !== 'leads' && (
-                                                <button onClick={handleSendAiEmail} disabled={!aiModalState.selectedDeal || aiModalState.sendStatus.includes('Sending')} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold w-full flex-1 disabled:opacity-50 flex items-center justify-center gap-2">
-                                                    <Mail size={16} /> Send Email
-                                                </button>
-                                            )}
-                                            <button onClick={handleSaveAiContent} disabled={aiModalState.saveStatus.includes('Saving')} className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold w-full flex-1 disabled:opacity-50 flex items-center justify-center gap-2">
-                                                <Save size={16} /> Save as Note
-                                            </button>
-                                        </div>
-                                        {aiModalState.saveStatus && <p className="text-sm text-center mt-2">{aiModalState.saveStatus}</p>}
-                                        {aiModalState.sendStatus && <p className="text-sm text-center mt-2">{aiModalState.sendStatus}</p>}
-                                    </>
-                                ) : (
-                                    <button onClick={handleGenerateAiContent} disabled={(aiModalState.type !== 'leads' && !aiModalState.selectedDeal)} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-3 rounded-lg font-semibold disabled:opacity-50">
-                                        Generate {aiModalState.type === 'email' ? 'Email' : aiModalState.type === 'leads' ? 'Leads' : 'Closing Email'}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </Card>
-                </div>
+                <AiSalesModal
+                    aiModalState={aiModalState}
+                    setAiModalState={setAiModalState}
+                    setIsAiModalVisible={setIsAiModalVisible}
+                    salesPipeline={salesPipeline}
+                    onSuccess={fetchSalesData}
+                />
             )}
 
             {isPromptModalVisible && (

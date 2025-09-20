@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2 } from 'lucide-react';
+import { XCircle, PlusCircle } from 'lucide-react';
 import Card from '../ui/Card';
 import { useAuth } from '../../AuthContext';
+import BrandedLoader from '../BrandedLoader';
 import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
@@ -21,10 +22,27 @@ export const NewCampaignModal = ({ onClose, onCampaignAdded }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
+    const validateForm = () => {
+        if (!newCampaign.name || !newCampaign.platform) {
+            setErrorMessage('Campaign name and platform are required.');
+            return false;
+        }
+        if (!newCampaign.start_date) {
+            setErrorMessage('Start date is required.');
+            return false;
+        }
+        return true;
+    };
+
     const handleAddCampaign = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
         setErrorMessage('');
+        
+        if (!validateForm()) {
+            return;
+        }
+        
+        setIsLoading(true);
 
         try {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/campaigns`, { 
@@ -39,7 +57,7 @@ export const NewCampaignModal = ({ onClose, onCampaignAdded }) => {
             onCampaignAdded();
             onClose();
         } catch (error) { 
-            console.log(error);
+            console.error(error);
             setErrorMessage(error.message);
         } finally {
             setIsLoading(false);
@@ -55,6 +73,7 @@ export const NewCampaignModal = ({ onClose, onCampaignAdded }) => {
                     type="error"
                     confirmText="Okay"
                     onConfirm={() => setErrorMessage('')}
+                    onClose={() => setErrorMessage('')}
                 />
             )}
             <Card className="max-w-lg w-full">
@@ -74,7 +93,7 @@ export const NewCampaignModal = ({ onClose, onCampaignAdded }) => {
                         <input type="number" placeholder="Conversions" onChange={e => setNewCampaign({...newCampaign, conversions: e.target.value})} className={formInputClasses}/>
                     </div>
                     <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Save Campaign'}
+                        {isLoading ? <BrandedLoader text="Saving..." /> : 'Save Campaign'}
                     </button>
                 </form>
             </Card>

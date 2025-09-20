@@ -375,7 +375,9 @@ const initializeDatabase = async () => {
             platform VARCHAR(100),
             status VARCHAR(50) DEFAULT 'draft',
             post_date TIMESTAMPTZ,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            is_scheduled BOOLEAN DEFAULT FALSE,
+            scheduled_date TIMESTAMPTZ
         )
     `;
 
@@ -477,15 +479,18 @@ const initializeDatabase = async () => {
         ALTER TABLE transactions
         ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'
     `;
-
-    const addTeamIdToUsersQuery = `
+    
+    const addMissingUserColumns = `
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-    `;
-
-    const addInviteTokenToUsersQuery = `
         ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
     `;
-
+    const addScheduledContentColumns = `
+        ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE;
+        ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMPTZ;
+    `;
     const adminEmail = 'damilolasoaga@gmail.com';
     const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'ChangeThisPassword123!';
     const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -494,21 +499,13 @@ const initializeDatabase = async () => {
         VALUES ('Admin', $1, $2, 'admin', TRUE)
         ON CONFLICT (email) DO NOTHING;
     `;
-
     const updateAdminPasswordQuery = `
         UPDATE users SET password = $1 WHERE email = $2 AND password != $1;
     `;
 
-        const addMissingUserColumns = `
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
-    `;
-
     try {
         await pool.query(addMissingUserColumns);
+        await pool.query(addScheduledContentColumns);
         await pool.query(userTableQuery);
         // await pool.query(waitlistTableQuery);
         await pool.query(clientsTableQuery);
@@ -527,8 +524,6 @@ const initializeDatabase = async () => {
         await pool.query(formSubmissionsTableQuery);
         await pool.query(userGoalsTableQuery);
         await pool.query(alterTransactionsQuery);
-        await pool.query(addTeamIdToUsersQuery);
-        await pool.query(addInviteTokenToUsersQuery);
         await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
         console.log(`Admin user for ${adminEmail} ensured with 'admin' role.`);
         await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
@@ -729,34 +724,42 @@ app.post('/api/forgot-password', async (req, res) => {
 
 // New password reset confirmation email ---
 app.post('/api/reset-password', async (req, res) => {
-    const { token, password } = req.body;
-    if (!token || !password) {
-        return res.status(400).json({ message: 'Token and new password are required.' });
-    }
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const { userId } = decoded;
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
-        
-        const userRes = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
-        if (userRes.rows.length > 0) {
-            const userEmail = userRes.rows[0].email;
-            const userName = userRes.rows[0].name || 'User';
-            const msg = {
-                to: userEmail,
-                from: 'noreply@entruvi.com',
-                subject: 'Your Entruvi password has been reset',
-                html: `<p>Hello ${userName},</p><p>This is a confirmation that the password for your Entruvi account has been successfully updated. If you did not make this change, please contact support immediately.</p><p>Thank you,<br/>The Entruvi Team</p>`,
-            };
-            await sgMail.send(msg);
-        }
+    const { token, password } = req.body;
 
-        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
-    } catch (error) {
-        console.error("Password reset error:", error);
-        res.status(400).json({ message: 'Invalid or expired password reset link.' });
-    }
+    if (!token || !password) {
+        return res.status(400).json({ message: 'Token and new password are required.' });
+    }
+
+    // --- NEW: Server-side password complexity validation ---
+    const strongPasswordRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{12,})");
+    if (!strongPasswordRegex.test(password)) {
+        return res.status(400).json({ message: 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { userId } = decoded;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+        
+        const userRes = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length > 0) {
+            const userEmail = userRes.rows[0].email;
+            const userName = userRes.rows[0].name || 'User';
+            const msg = {
+                to: userEmail,
+                from: 'noreply@entruvi.com',
+                subject: 'Your Entruvi password has been reset',
+                html: `<p>Hello ${userName},</p><p>This is a confirmation that the password for your Entruvi account has been successfully updated. If you did not make this change, please contact support immediately.</p><p>Thank you,<br/>The Entruvi Team</p>`,
+            };
+            await sgMail.send(msg);
+        }
+
+        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
+    } catch (error) {
+        console.error("Password reset error:", error);
+        res.status(400).json({ message: 'Invalid or expired password reset link.' });
+    }
 });
 
 app.get('/api/profile', authenticateToken, async (req, res) => {
@@ -837,34 +840,40 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/profile/onboarding', authenticateToken, async (req, res) => {
-    const { businessType, company, companyLogoUrl, primaryGoal } = req.body;
-    const { userId } = req.user;
-    try {
-        await pool.query(
-            `UPDATE users SET
-                business_type = $1,
-                company = $2,
-                company_logo_url = $3,
-                primary_goal = $4,
-                is_onboarded = TRUE
-             WHERE id = $5`,
-            [businessType, company, companyLogoUrl, primaryGoal, userId]
-        );
-        const updatedUserRes = await pool.query(
-            `SELECT
-                id, name, email, company, phone_number AS "phoneNumber",
-                profile_picture_url AS "profilePictureUrl", company_description AS "companyDescription",
-                company_logo_url AS "companyLogoUrl", address, city_province_postal AS "cityProvincePostal",
-                plan_type AS "planType", subscription_status AS "subscriptionStatus",
-                is_onboarded AS "isOnboarded"
-            FROM users WHERE id = $1`,
-            [userId]
-        );
-        res.status(200).json({ message: 'Onboarding complete!', user: updatedUserRes.rows[0] });
-    } catch (err) {
-        console.error('Error saving onboarding data:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { businessType, company, companyLogoUrl, primaryGoal } = req.body;
+    const { userId } = req.user;
+
+    // --- NEW: Server-side validation ---
+    if (!company || !primaryGoal) {
+        return res.status(400).json({ message: 'Company name and primary goal are required.' });
+    }
+
+    try {
+        await pool.query(
+            `UPDATE users SET
+                business_type = $1,
+                company = $2,
+                company_logo_url = $3,
+                primary_goal = $4,
+                is_onboarded = TRUE
+             WHERE id = $5`,
+            [businessType, company, companyLogoUrl, primaryGoal, userId]
+        );
+        const updatedUserRes = await pool.query(
+            `SELECT
+                id, name, email, company, phone_number AS "phoneNumber",
+                profile_picture_url AS "profilePictureUrl", company_description AS "companyDescription",
+                company_logo_url AS "companyLogoUrl", address, city_province_postal AS "cityProvincePostal",
+                plan_type AS "planType", subscription_status AS "subscriptionStatus",
+                is_onboarded AS "isOnboarded"
+            FROM users WHERE id = $1`,
+            [userId]
+        );
+        res.status(200).json({ message: 'Onboarding complete!', user: updatedUserRes.rows[0] });
+    } catch (err) {
+        console.error('Error saving onboarding data:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.get('/api/goals', authenticateToken, async (req, res) => {

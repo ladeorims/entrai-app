@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2, Download, Send, Save } from 'lucide-react';
+import { XCircle, Save, Download, Send } from 'lucide-react';
 import Card from '../ui/Card';
 import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
 import { useAuth } from '../../AuthContext';
 import CustomModal from '../ui/CustomModal';
+import BrandedLoader from '../BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formTextareaClasses = `${formInputClasses} h-24`;
@@ -16,19 +17,20 @@ export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
         issue_date: new Date().toISOString().split('T')[0], 
         due_date: '', 
         notes: '', 
-        tax_rate: '', 
+        tax_rate: 0, 
         lineItems: [{ description: '', quantity: 1, unit_price: 0, total: 0 }] 
     });
-    const [actionStatus, setActionStatus] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [processingAction, setProcessingAction] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
+    const [statusMessage, setStatusMessage] = useState(''); // Corrected variable
 
     const handleLineItemChange = (index, field, value) => {
         const items = [...newInvoice.lineItems];
         const currentItem = items[index];
         currentItem[field] = value;
 
-        if (user.businessType === 'goods') {
+        if (user?.businessType === 'goods') {
             const quantity = parseFloat(currentItem.quantity) || 0;
             const unit_price = parseFloat(currentItem.unit_price) || 0;
             currentItem.total = quantity * unit_price;
@@ -45,13 +47,33 @@ export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
         setNewInvoice({ ...newInvoice, lineItems: [...newInvoice.lineItems, { description: '', quantity: 1, unit_price: 0, total: 0 }] });
     };
 
-    const handleInvoiceAction = async (action) => {
+    const validateForm = () => {
         if (!newInvoice.client_id) {
             setErrorMessage('Error: Please select a client.');
+            return false;
+        }
+        if (!newInvoice.issue_date || !newInvoice.due_date) {
+            setErrorMessage('Error: Issue date and due date are required.');
+            return false;
+        }
+        for (const item of newInvoice.lineItems) {
+            if (!item.description || (user?.businessType === 'goods' && (!item.quantity || !item.unit_price)) || (user?.businessType !== 'goods' && !item.total)) {
+                setErrorMessage('Error: All line items must have a description and a value.');
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const handleInvoiceAction = async (action) => {
+        setErrorMessage('');
+        setStatusMessage('');
+        if (!validateForm()) {
             return;
         }
+
         setIsProcessing(true);
-        setActionStatus(`Processing: ${action}...`);
+        setProcessingAction(action);
         
         try {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices`, {
@@ -65,28 +87,36 @@ export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
             const invoiceId = result.invoiceId;
             
             if (action === 'download') {
-                const downloadUrl = `${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/download?token=${token}`;
-                window.open(downloadUrl, '_blank');
-                setActionStatus('Success! Downloading...');
+                const downloadUrl = `${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/download`;
+                const downloadResponse = await fetch(downloadUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+                const blob = await downloadResponse.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `invoice-${invoiceId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setStatusMessage('Success! Downloading...');
             } else if (action === 'send') {
                 await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/send`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                setActionStatus('Success! Invoice sent.');
+                setStatusMessage('Success! Invoice sent.');
             } else {
-                setActionStatus('Success! Draft saved.');
+                setStatusMessage('Success! Draft saved.');
             }
 
-            setTimeout(() => {
-                onInvoiceCreated();
-                onClose();
-            }, 1500);
+            onInvoiceCreated();
+            onClose();
 
         } catch (error) { 
             console.error("Failed to process invoice:", error); 
             setErrorMessage(`Error: ${error.message}`);
+        } finally {
             setIsProcessing(false);
+            setProcessingAction(null);
         }
     };
 
@@ -99,6 +129,7 @@ export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
                     type="error"
                     confirmText="Okay"
                     onConfirm={() => setErrorMessage('')}
+                    onClose={() => setErrorMessage('')}
                 />
             )}
             <Card className="max-w-3xl w-full">
@@ -139,11 +170,17 @@ export const CreateInvoiceModal = ({ clients, onClose, onInvoiceCreated }) => {
                     <textarea placeholder="Notes..." value={newInvoice.notes} onChange={e => setNewInvoice({...newInvoice, notes: e.target.value})} className={formTextareaClasses} rows="3" />
                 </div>
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
-                    <button type="button" onClick={() => handleInvoiceAction('draft')} disabled={isProcessing} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50"><Save size={16}/> Save as Draft</button>
-                    <button type="button" onClick={() => handleInvoiceAction('download')} disabled={isProcessing} className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50"><Download size={16}/> Save & Download</button>
-                    <button type="button" onClick={() => handleInvoiceAction('send')} disabled={isProcessing} className="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-green-700 disabled:opacity-50"><Send size={16}/> Save & Send</button>
+                    <button type="button" onClick={() => handleInvoiceAction('draft')} disabled={isProcessing} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
+                        {isProcessing && processingAction === 'draft' ? <BrandedLoader text="Saving..." /> : <><Save size={16}/> Save as Draft</>}
+                    </button>
+                    <button type="button" onClick={() => handleInvoiceAction('download')} disabled={isProcessing} className="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50">
+                        {isProcessing && processingAction === 'download' ? <BrandedLoader text="Downloading..." /> : <><Download size={16}/> Save & Download</>}
+                    </button>
+                    <button type="button" onClick={() => handleInvoiceAction('send')} disabled={isProcessing} className="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold flex items-center gap-2 hover:bg-green-700 disabled:opacity-50">
+                        {isProcessing && processingAction === 'send' ? <BrandedLoader text="Sending..." /> : <><Send size={16}/> Save & Send</>}
+                    </button>
                 </div>
-                {actionStatus && <p className="text-center text-sm mt-2">{actionStatus}</p>}
+                {statusMessage && <p className="text-center text-sm mt-2">{statusMessage}</p>}
             </Card>
         </div>
     );

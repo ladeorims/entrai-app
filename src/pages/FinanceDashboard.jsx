@@ -13,7 +13,7 @@ const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border bor
 const formSelectClasses = `${formInputClasses} form-select`;
 
 // Reusable component for displaying the main finance view (metrics, chart, transactions)
-const FinanceView = ({ summaryData, filterPeriod, setFilterPeriod, onAnalyze, onExport, onDeleteTransaction, onEditTransaction }) => {
+const FinanceView = ({ summaryData, filterPeriod, setFilterPeriod, onDeleteTransaction, onEditTransaction, onAnalyze, onExport }) => {
     return (
         <div className="space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -89,13 +89,14 @@ const FinanceDashboard = () => {
     const [invoices, setInvoices] = useState([]);
     const [clients, setClients] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterPeriod, setFilterPeriod] = useState('daily');
+    const [filterPeriod, setFilterPeriod] = useState('monthly');
     const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('');
     const [isTransactionModalVisible, setIsTransactionModalVisible] = useState(false);
     const [isInvoiceModalVisible, setIsInvoiceModalVisible] = useState(false);
     const [isAiModalVisible, setIsAiModalVisible] = useState(false);
     const [isTransferModalVisible, setIsTransferModalVisible] = useState(false);
     const [viewingInvoice, setViewingInvoice] = useState(null);
+    const [isViewingInvoiceLoading, setIsViewingInvoiceLoading] = useState(false);
     const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
     const [editableInvoiceNumber, setEditableInvoiceNumber] = useState('');
     const [newTransaction, setNewTransaction] = useState({ title: '', amount: '', type: 'expense', category: '', transaction_date: new Date().toISOString().split('T')[0], scope: 'business' });
@@ -114,7 +115,6 @@ const FinanceDashboard = () => {
 
     const fetchData = useCallback(async () => {
         if (!token) { setIsLoading(false); return; }
-        setIsLoading(true);
         try {
             const [businessSummaryRes, personalSummaryRes, invoicesRes, clientsRes, alertsRes] = await Promise.all([
                 fetch(`${import.meta.env.VITE_API_BASE_URL}/api/finance/summary?period=${filterPeriod}&scope=business`, { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -137,13 +137,21 @@ const FinanceDashboard = () => {
     }, [token, filterPeriod, invoiceSearchTerm]);
 
     useEffect(() => {
+        setIsLoading(true);
         fetchData();
-    }, [filterPeriod, fetchData]);
+    }, [fetchData]);
 
     const handleAddTransaction = async (e) => {
         e.preventDefault();
         const currentScope = view === 'invoices' ? 'business' : view;
         const transactionPayload = { ...newTransaction, scope: currentScope };
+        
+        // --- NEW: Client-side validation ---
+        if (!transactionPayload.title || !transactionPayload.amount || !transactionPayload.category) {
+            setActionStatus('Please fill all transaction fields.');
+            return;
+        }
+
         try {
             await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(transactionPayload) });
             setIsTransactionModalVisible(false);
@@ -188,9 +196,17 @@ const FinanceDashboard = () => {
     };
     
     const viewInvoiceDetails = async (invoiceId) => {
-        const invoice = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json());
-        setViewingInvoice(invoice);
-        setEditableInvoiceNumber(invoice.invoice_number);
+        setIsViewingInvoiceLoading(true); // --- NEW: Start loading for invoice modal ---
+        setViewingInvoice(null); // --- NEW: Clear previous invoice data ---
+        try {
+            const invoice = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json());
+            setViewingInvoice(invoice);
+            setEditableInvoiceNumber(invoice.invoice_number);
+        } catch (error) {
+            console.error("Failed to fetch invoice details:", error);
+        } finally {
+            setIsViewingInvoiceLoading(false); // --- NEW: End loading for invoice modal ---
+        }
     };
 
     const handleUpdateInvoiceNumber = async () => {
@@ -331,35 +347,41 @@ const FinanceDashboard = () => {
                 </Card>
             )}
 
-            {view === 'business' && <FinanceView summaryData={businessSummary} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} onAddTransaction={() => setIsTransactionModalVisible(true)} onDeleteTransaction={confirmDeleteTransaction} onEditTransaction={(t) => { setTransactionToEdit(t); setIsEditTransactionModalOpen(true); }} onAnalyze={() => { handleAiAnalysis(); setIsAiModalVisible(true); }} onExport={handleExportCSV} />}
-            {view === 'personal' && <FinanceView summaryData={personalSummary} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} onAddTransaction={() => setIsTransactionModalVisible(true)} onDeleteTransaction={confirmDeleteTransaction} onEditTransaction={(t) => { setTransactionToEdit(t); setIsEditTransactionModalOpen(true); }} onAnalyze={() => { handleAiAnalysis(); setIsAiModalVisible(true); }} onExport={handleExportCSV} />}
+            {view === 'business' && <FinanceView summaryData={businessSummary} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} onDeleteTransaction={confirmDeleteTransaction} onEditTransaction={(t) => { setTransactionToEdit(t); setIsEditTransactionModalOpen(true); }} onAnalyze={() => { handleAiAnalysis(); setIsAiModalVisible(true); }} onExport={handleExportCSV} />}
+            {view === 'personal' && <FinanceView summaryData={personalSummary} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} onDeleteTransaction={confirmDeleteTransaction} onEditTransaction={(t) => { setTransactionToEdit(t); setIsEditTransactionModalOpen(true); }} onAnalyze={() => { handleAiAnalysis(); setIsAiModalVisible(true); }} onExport={handleExportCSV} />}
             
             {view === 'invoices' && (
-                <Card>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold">All Invoices</h2>
-                        <div className="flex items-center gap-2">
-                            <input type="text" placeholder="Search invoices..." value={invoiceSearchTerm} onChange={(e) => setInvoiceSearchTerm(e.target.value)} className={`${formInputClasses} text-sm`} />
-                            <button onClick={() => setIsInvoiceModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 flex items-center gap-2">
-                                <PlusCircle size={16} /> New Invoice
-                            </button>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        {invoices.map(inv => (
-                            <div key={inv.id} onClick={() => viewInvoiceDetails(inv.id)} className="p-3 bg-slate-100/50 dark:bg-dark-primary-bg/50 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-200/50 dark:hover:bg-dark-primary-bg">
-                                <div>
-                                    <p className="font-semibold">{inv.invoice_number}</p>
-                                    <p className="text-sm text-text-secondary dark:text-dark-text-secondary">{inv.client_name}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="font-semibold">${Number(inv.total_amount).toLocaleString()}</p>
-                                    <p className={`text-sm capitalize ${inv.status === 'paid' ? 'text-green-400' : inv.status === 'sent' ? 'text-yellow-400' : 'text-slate-400'}`}>{inv.status}</p>
+                <>
+                    {isViewingInvoiceLoading ? (
+                        <div className="flex items-center justify-center h-48"><Loader2 className="animate-spin text-accent-start" size={32}/></div>
+                    ) : (
+                        <Card>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-semibold">All Invoices</h2>
+                                <div className="flex items-center gap-2">
+                                    <input type="text" placeholder="Search invoices..." value={invoiceSearchTerm} onChange={(e) => setInvoiceSearchTerm(e.target.value)} className={`${formInputClasses} text-sm`} />
+                                    <button onClick={() => setIsInvoiceModalVisible(true)} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 flex items-center gap-2">
+                                        <PlusCircle size={16} /> New Invoice
+                                    </button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </Card>
+                            <div className="space-y-2">
+                                {invoices.map(inv => (
+                                    <div key={inv.id} onClick={() => viewInvoiceDetails(inv.id)} className="p-3 bg-slate-100/50 dark:bg-dark-primary-bg/50 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-200/50 dark:hover:bg-dark-primary-bg">
+                                        <div>
+                                            <p className="font-semibold">{inv.invoice_number}</p>
+                                            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">{inv.client_name}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold">${Number(inv.total_amount).toLocaleString()}</p>
+                                            <p className={`text-sm capitalize ${inv.status === 'paid' ? 'text-green-400' : inv.status === 'sent' ? 'text-yellow-400' : 'text-slate-400'}`}>{inv.status}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
+                </>
             )}
 
             {isTransactionModalVisible && (
@@ -369,6 +391,7 @@ const FinanceDashboard = () => {
                             <h2 className="text-xl font-semibold">New Transaction</h2>
                             <button onClick={() => setIsTransactionModalVisible(false)}><XCircle className="text-text-secondary dark:text-dark-text-secondary"/></button>
                         </div>
+                        {actionStatus && <p className="text-center text-sm text-red-500 mb-4">{actionStatus}</p>}
                         <form onSubmit={handleAddTransaction} className="space-y-4">
                             <input type="text" placeholder="Title (e.g., Client Payment)" value={newTransaction.title} onChange={e => setNewTransaction({...newTransaction, title: e.target.value})} className={formInputClasses} required />
                             <input type="number" placeholder="Amount" value={newTransaction.amount} onChange={e => setNewTransaction({...newTransaction, amount: e.target.value})} className={formInputClasses} required />
@@ -383,6 +406,7 @@ const FinanceDashboard = () => {
                                 value={newTransaction.category} 
                                 onChange={e => setNewTransaction({...newTransaction, category: e.target.value})} 
                                 className={formInputClasses} 
+                                required
                             />
                             <datalist id="categories">
                                 {(newTransaction.type === 'expense' ? expenseCategories : incomeCategories).map(cat => (
@@ -444,7 +468,7 @@ const FinanceDashboard = () => {
                                     {isPaying ? <BrandedLoader text="Redirecting..." /> : <><CreditCard size={16} /> Pay with Stripe</>}
                                 </button>
                             )}
-                            <a href={`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${viewingInvoice.id}/download?token=${token}`} download className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary py-2 px-4 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 inline-flex items-center justify-center gap-2">
+                            <a href={`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${viewingInvoice.id}/download`} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary py-2 px-4 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 inline-flex items-center justify-center gap-2">
                                 <Download size={16}/> Download PDF
                             </a>
                             {viewingInvoice.status === 'sent' && (

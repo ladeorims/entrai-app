@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2, ArrowRight } from 'lucide-react';
+import { XCircle, ArrowRight } from 'lucide-react';
 import Card from '../ui/Card';
 import { useAuth } from '../../AuthContext';
 import CustomModal from '../ui/CustomModal';
+import BrandedLoader from '../BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} form-select`;
@@ -76,6 +77,7 @@ export const TransferModal = ({ onClose, onTransferSuccess }) => {
                     type="error"
                     confirmText="Okay"
                     onConfirm={() => setErrorMessage('')}
+                    onClose={() => setErrorMessage('')}
                 />
             )}
             <Card className="max-w-md w-full">
@@ -119,7 +121,7 @@ export const TransferModal = ({ onClose, onTransferSuccess }) => {
                     />
                     {errorMessage && <p className="text-sm text-red-500 text-center">{errorMessage}</p>}
                     <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Log Transfer'}
+                        {isLoading ? <BrandedLoader text="Logging..." /> : 'Log Transfer'}
                     </button>
                 </form>
             </Card>

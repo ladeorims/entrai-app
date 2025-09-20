@@ -3,9 +3,11 @@ import { XCircle, Save, Loader2, UserPlus, Users } from 'lucide-react';
 import Card from '../ui/Card';
 import { SearchableClientDropdown } from '../ui/SearchableClientDropdown';
 import { useAuth } from '../../AuthContext';
+import BrandedLoader from '../BrandedLoader';
 import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
+const formSelectClasses = `${formInputClasses} form-select`;
 const salesStages = ['New Leads', 'Contacted', 'Proposal Sent', 'Negotiation', 'Closed Won'];
 
 export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClient = false }) => {
@@ -16,6 +18,7 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
     const [clientCheck, setClientCheck] = useState({ checked: false, exists: false, message: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [clientCheckLoading, setClientCheckLoading] = useState(false);
 
     useEffect(() => {
         setIsCreatingClient(defaultToNewClient);
@@ -23,6 +26,8 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
 
     const handleClientEmailCheck = async () => {
         if (!newClient.email) return;
+        setClientCheckLoading(true);
+        setErrorMessage('');
         try {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/sales/clients/check?email=${encodeURIComponent(newClient.email)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -32,13 +37,16 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
                 setClientCheck({
                     checked: true,
                     exists: true,
-                    message: `This client already exists. Switch to "Select Existing" to add a deal for them.`
+                    message: `This client already exists. Please select them from the list or use a different email.`
                 });
             } else {
                 setClientCheck({ checked: true, exists: false, message: '' });
             }
         } catch (error) {
             console.error("Error checking client email:", error);
+            setErrorMessage('Failed to check client email.');
+        } finally {
+            setClientCheckLoading(false);
         }
     };
 
@@ -47,8 +55,27 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
         setIsLoading(true);
         setErrorMessage('');
 
-        if (isCreatingClient && clientCheck.exists) {
-            setErrorMessage(clientCheck.message);
+        if (isCreatingClient) {
+            if (!newClient.name || !newClient.email) {
+                setErrorMessage('Client name and email are required.');
+                setIsLoading(false);
+                return;
+            }
+            if (!clientCheck.checked || clientCheck.exists) {
+                await handleClientEmailCheck();
+                setIsLoading(false);
+                return;
+            }
+        } else {
+            if (!newDeal.client_id) {
+                setErrorMessage('You must select a client.');
+                setIsLoading(false);
+                return;
+            }
+        }
+
+        if (!newDeal.name || !newDeal.value) {
+            setErrorMessage('Deal name and value are required.');
             setIsLoading(false);
             return;
         }
@@ -105,6 +132,7 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
                     type="error"
                     confirmText="Okay"
                     onConfirm={() => setErrorMessage('')}
+                    onClose={() => setErrorMessage('')}
                 />
             )}
             <Card className="max-w-xl w-full">
@@ -145,7 +173,9 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
                                     className={formInputClasses} 
                                     required 
                                     placeholder="Client Email"
+                                    disabled={clientCheckLoading}
                                 />
+                                {clientCheckLoading && <div className="mt-2 text-center text-sm text-text-secondary dark:text-dark-text-secondary">Checking email...</div>}
                                 {clientCheck.exists && (
                                     <p className="text-sm text-red-500 mt-2">{clientCheck.message}</p>
                                 )}
@@ -160,14 +190,14 @@ export const ClientDealModal = ({ clients, onClose, onSuccess, defaultToNewClien
                     <hr className="border-slate-200 dark:border-slate-700"/>
                     <input type="text" value={newDeal.name} onChange={(e) => setNewDeal({ ...newDeal, name: e.target.value })} className={formInputClasses} required placeholder="Deal Name (e.g., Website Redesign)"/>
                     <input type="number" value={newDeal.value} onChange={(e) => setNewDeal({ ...newDeal, value: e.target.value })} className={formInputClasses} required placeholder="Deal Value ($)"/>
-                    <select value={newDeal.stage} onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value })} className={`${formInputClasses} form-select`} required>
+                    <select value={newDeal.stage} onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value })} className={formSelectClasses} required>
                         {salesStages.map(stage => <option key={stage} value={stage}>{stage}</option>)}
                     </select>
                     {errorMessage && <p className="text-sm text-red-500 text-center">{errorMessage}</p>}
                     <div className="flex justify-end gap-2 pt-2">
                         <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</button>
                         <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
-                            {isLoading ? <Loader2 className="animate-spin" /> : <Save size={16} />} Save Deal
+                            {isLoading ? <BrandedLoader text="Saving..." /> : <><Save size={16} /> Save Deal</>}
                         </button>
                     </div>
                 </form>

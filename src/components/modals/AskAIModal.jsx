@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2, Wand2, Sparkles } from 'lucide-react';
 import Card from '../ui/Card';
+import BrandedLoader from '../BrandedLoader';
 import { useAuth } from '../../AuthContext';
+import { Wand2, XCircle, Sparkles } from 'lucide-react';
 
+// Use the consistent form class definition
 const formTextareaClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary h-24";
 
 export const AskAIModal = ({ onClose }) => {
@@ -51,7 +53,7 @@ export const AskAIModal = ({ onClose }) => {
                         rows="4"
                     />
                     <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white py-3 rounded-lg font-semibold flex items-center justify-center hover:opacity-90 disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : <><Sparkles size={16} className="mr-2" /> Get Answer</>}
+                        {isLoading ? <BrandedLoader text="Getting answer..." /> : <><Sparkles size={16} className="mr-2" /> Get Answer</>}
                     </button>
                 </form>
                 {response && (

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2, Plus, Trash2 } from 'lucide-react';
 import Card from '../ui/Card';
+import { XCircle, PlusCircle } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
+import BrandedLoader from '../BrandedLoader';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 const formSelectClasses = `${formInputClasses} text-left`;
@@ -62,7 +63,7 @@ export const AddTaskModal = ({ onClose, onTaskAdded }) => {
                             <option>Medium</option>
                             <option>High</option>
                         </select>
-                        <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} className={formSelectClasses} />
+                        <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} className={formInputClasses} />
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
@@ -79,7 +80,7 @@ export const AddTaskModal = ({ onClose, onTaskAdded }) => {
                     </div>
                     {errorMessage && <p className="text-sm text-red-500 text-center">{errorMessage}</p>}
                     <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Add Task'}
+                        {isLoading ? <BrandedLoader text="Adding..." /> : 'Add Task'}
                     </button>
                 </form>
             </Card>

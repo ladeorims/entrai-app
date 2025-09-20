@@ -16,46 +16,66 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
-    const fetchData = useCallback(async () => {
-        if (!token) { setIsLoading(false); return; }
-        setIsLoading(true);
+    const fetchOverviewData = useCallback(async () => {
+        if (!token) return;
         try {
-            const [overviewRes, usersRes] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/overview`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } })
-            ]);
-            
-            if (!overviewRes.ok) throw new Error('Failed to fetch admin overview. Ensure you have admin privileges.');
-            if (!usersRes.ok) throw new Error('Failed to fetch users list.');
-
+            const overviewRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/overview`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!overviewRes.ok) throw new Error('Failed to fetch admin overview. Check permissions.');
             setOverviewData(await overviewRes.json());
+        } catch (error) {
+            console.error(error);
+            setError(error.message);
+        }
+    }, [token]);
+
+    const fetchUsers = useCallback(async () => {
+        if (!token) return;
+        try {
+            const usersRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!usersRes.ok) throw new Error('Failed to fetch users list.');
             setUsers(await usersRes.json());
         } catch (error) {
             console.error(error);
-        } finally {
-            setIsLoading(false);
+            setError(error.message);
         }
     }, [token]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-    
+        const init = async () => {
+            setIsLoading(true);
+            await Promise.all([fetchOverviewData(), fetchUsers()]);
+            setIsLoading(false);
+        };
+        init();
+    }, [fetchOverviewData, fetchUsers]);
+
     const handleDeleteUser = async (userId) => {
+        setIsDeleting(true);
+        setError('');
+        setSuccessMessage('');
         try {
             const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users/${userId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             if (!res.ok) throw new Error('Deletion failed.');
-            fetchData();
+            
+            setUsers(users.filter(u => u.id !== userId));
             setShowDeleteConfirmation(false);
+            setUserToDelete(null);
+            setSuccessMessage('User deleted successfully.');
         } catch (err) {
             console.error(err);
+            setError(err.message || 'An error occurred during deletion.');
+        } finally {
+            setIsDeleting(false);
         }
     };
     
@@ -113,6 +133,8 @@ const AdminDashboard = () => {
                 <h2 className="text-xl font-semibold">User Management</h2>
                 <input type="text" placeholder="Search by name or email..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className={formInputClasses + " max-w-xs"} />
             </div>
+            {error && <div className="mb-4 text-red-500 text-sm">{error}</div>}
+            {successMessage && <div className="mb-4 text-green-500 text-sm">{successMessage}</div>}
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                     <thead className="bg-slate-50 dark:bg-slate-800">
@@ -140,8 +162,8 @@ const AdminDashboard = () => {
                                     {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onClick={() => setEditingUser(u)} className="text-accent-start dark:text-dark-accent-mid hover:opacity-70 mr-4"><Edit size={16}/></button>
-                                    <button onClick={() => confirmDeleteUser(u)} className="text-red-500 hover:opacity-70"><Trash2 size={16}/></button>
+                                    <button onClick={() => setEditingUser(u)} className="text-accent-start dark:text-dark-accent-mid hover:opacity-70 mr-4" disabled={isDeleting}><Edit size={16}/></button>
+                                    <button onClick={() => confirmDeleteUser(u)} className="text-red-500 hover:opacity-70" disabled={isDeleting}><Trash2 size={16}/></button>
                                 </td>
                             </tr>
                         ))}
@@ -153,15 +175,15 @@ const AdminDashboard = () => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {editingUser && <UserEditModal user={editingUser} onClose={() => setEditingUser(null)} onUpdate={fetchData} />}
+            {editingUser && <UserEditModal user={editingUser} onClose={() => setEditingUser(null)} onUpdate={fetchUsers} />}
             {showDeleteConfirmation && (
                 <CustomModal
                     title="Confirm Deletion"
-                    message={`Are you sure you want to delete the user "${userToDelete?.name}"? This action cannot be undone.`}
+                    message={isDeleting ? 'Deleting...' : `Are you sure you want to delete the user "${userToDelete?.name}"? This action cannot be undone.`}
                     type="confirm"
                     confirmText="Delete"
                     onConfirm={() => handleDeleteUser(userToDelete?.id)}
-                    onClose={() => setShowDeleteConfirmation(false)}
+                    onClose={() => !isDeleting && setShowDeleteConfirmation(false)}
                 />
             )}
             

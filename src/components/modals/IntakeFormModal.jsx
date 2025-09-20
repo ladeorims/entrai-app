@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { XCircle, Loader2, Plus, Trash2, Copy, Check } from 'lucide-react';
+import { XCircle, Plus, Trash2, Copy, Check } from 'lucide-react';
 import Card from '../ui/Card';
-
+import BrandedLoader from '../BrandedLoader';
+// import { useAuth } from '../../AuthContext';
+import CustomModal from '../ui/CustomModal';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 
-
 export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
+    // const { token } = useAuth();
     const [form, setForm] = useState(initialForm || { questions: [{ text: 'What are your primary goals for this project?' }] });
     const [isLoading, setIsLoading] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const handleQuestionChange = (index, value) => {
         const newQuestions = [...form.questions];
@@ -28,9 +31,16 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
 
     const handleSave = async () => {
         setIsLoading(true);
-        await onSave(form.questions);
-        setIsLoading(false);
-        onClose();
+        setErrorMessage('');
+        try {
+            await onSave(form.questions);
+            onClose();
+        } catch (error) {
+            console.error('Error saving intake form:', error);
+            setErrorMessage(error.message || 'Failed to save form.');
+        } finally {
+            setIsLoading(false);
+        }
     };
     
     const copyLinkToClipboard = () => {
@@ -42,6 +52,16 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            {errorMessage && (
+                <CustomModal
+                    title="Error"
+                    message={errorMessage}
+                    type="error"
+                    confirmText="Okay"
+                    onConfirm={() => setErrorMessage('')}
+                    onClose={() => setErrorMessage('')}
+                />
+            )}
             <Card className="max-w-2xl w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Client Intake Form Builder</h2>
@@ -71,21 +91,21 @@ export const IntakeFormModal = ({ initialForm, onClose, onSave }) => {
                 <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
                     {form.id && (
                         <div className="space-y-2">
-                             <label className="text-sm font-semibold">Your Shareable Form Link:</label>
-                             <div className="flex items-center gap-2">
-                                 <input type="text" readOnly value={`${window.location.origin}/form/${form.id}`} className={`${formInputClasses} text-text-secondary dark:text-dark-text-secondary`} />
-                                 <button onClick={copyLinkToClipboard} className="bg-slate-200 dark:bg-slate-700 px-4 py-3 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
-                                     {isCopied ? <Check size={16} className="text-green-500"/> : <Copy size={16} />}
-                                 </button>
-                             </div>
-                         </div>
-                     )}
+                            <label className="text-sm font-semibold">Your Shareable Form Link:</label>
+                            <div className="flex items-center gap-2">
+                                <input type="text" readOnly value={`${window.location.origin}/form/${form.id}`} className={`${formInputClasses} text-text-secondary dark:text-dark-text-secondary`} />
+                                <button onClick={copyLinkToClipboard} className="bg-slate-200 dark:bg-slate-700 px-4 py-3 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center gap-2">
+                                    {isCopied ? <Check size={16} className="text-green-500"/> : <Copy size={16} />}
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-2 mt-4">
                     <button onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-text-primary dark:text-dark-text-primary px-4 py-2 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600">Close</button>
                     <button onClick={handleSave} disabled={isLoading} className="bg-gradient-to-r from-accent-start to-accent-end text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Save Form'}
+                        {isLoading ? <BrandedLoader text="Saving..." /> : 'Save Form'}
                     </button>
                 </div>
             </Card>

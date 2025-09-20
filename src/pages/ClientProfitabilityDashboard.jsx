@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, BarChart3, TrendingUp, DollarSign } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import Card from '../components/ui/Card';
+import BrandedLoader from '../components/BrandedLoader';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ClientProfitabilityDashboard = () => {
@@ -21,20 +22,6 @@ const ClientProfitabilityDashboard = () => {
             
             const result = await response.json();
             setData(result.profitabilityData);
-            
-            // Calculate metrics
-            if (result.profitabilityData.length > 0) {
-                const topClientData = result.profitabilityData.reduce((prev, current) => (prev.totalValue > current.totalValue) ? prev : current);
-                const totalValue = result.profitabilityData.reduce((sum, client) => sum + client.totalValue, 0);
-                const averageValue = totalValue / result.profitabilityData.length;
-
-                setMetrics({
-                    topClient: topClientData.name,
-                    highestValue: topClientData.totalValue,
-                    averageValue: averageValue,
-                });
-            }
-
         } catch (error) {
             console.error(error);
         } finally {
@@ -42,12 +29,30 @@ const ClientProfitabilityDashboard = () => {
         }
     }, [token]);
 
+    const calculateMetrics = useCallback(() => {
+        if (data.length > 0) {
+            const topClientData = data.reduce((prev, current) => (prev.totalValue > current.totalValue) ? prev : current);
+            const totalValue = data.reduce((sum, client) => sum + client.totalValue, 0);
+            const averageValue = totalValue / data.length;
+
+            setMetrics({
+                topClient: topClientData.name,
+                highestValue: topClientData.totalValue,
+                averageValue: averageValue,
+            });
+        }
+    }, [data]);
+
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
+    useEffect(() => {
+        calculateMetrics();
+    }, [data, calculateMetrics]);
+
     if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent-start" size={32} /></div>;
+        return <div className="flex items-center justify-center h-full"><BrandedLoader /></div>;
     }
 
     // Determine bar color based on dark mode preference
