@@ -4,6 +4,7 @@ import Card from "../components/ui/Card";
 import { User, Mail, Star, Phone, LogOut, Save, XCircle, ArrowLeft, Image as ImageIcon } from "lucide-react";
 import UpgradeModal from '../components/UpgradeModal';
 import { useAuth } from '../AuthContext';
+import BrandedLoader from '../components/BrandedLoader';
 
 const formInputClasses = "w-full mt-1 bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid";
 const formTextareaClasses = `${formInputClasses} h-auto`;
@@ -35,7 +36,6 @@ const ProfilePage = () => {
         if (!token) return;
         setUpdateMessage({ type: '', text: '' });
 
-        // --- NEW: Basic client-side validation ---
         if (!formData.name || !formData.company) {
             setUpdateMessage({ type: 'error', text: 'Name and Company Name are required.' });
             return;
@@ -53,8 +53,13 @@ const ProfilePage = () => {
                 throw new Error(result.message || "Failed to update profile.");
             }
 
-            localStorage.setItem("token", result.token);
-            setUser(result.user);
+            // --- FIX: Safely update the user state ---
+            if (result.user) {
+                localStorage.setItem("token", result.token);
+                setUser(result.user);
+            } else {
+                throw new Error("Invalid response from server. User data is missing.");
+            }
             
             setUpdateMessage({ type: 'success', text: 'Profile updated successfully!' });
             setIsEditing(false);
