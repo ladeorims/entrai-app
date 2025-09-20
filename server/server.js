@@ -205,7 +205,10 @@ const generateInvoicePDF = async (invoiceId, userId) => {
             : [item.description, `$${Number(item.total).toFixed(2)}`];
         tableRows.push(itemData);
     });
-    autoTable(doc, { head: [tableColumn], body: tableRows, startY: 85, theme: 'striped' });
+    
+    // --- THIS IS THE CORRECTED LINE ---
+    doc.autoTable({ head: [tableColumn], body: tableRows, startY: 85, theme: 'striped' });
+
     const finalY = doc.lastAutoTable.finalY || 150;
     doc.setFontSize(12);
     doc.text(`Subtotal: $${(invoice.total_amount - invoice.tax_amount).toFixed(2)}`, 200, finalY + 15, { align: 'right' });
@@ -880,21 +883,21 @@ app.get('/api/goals', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/goals', authenticateToken, async (req, res) => {
-    const { userId } = req.user;
-    const { revenue_goal, new_clients_goal, deals_won_goal } = req.body;
-    try {
-        const updatedGoalsRes = await pool.query(
-            `UPDATE user_goals
-             SET revenue_goal = $1, new_clients_goal = $2, deals_won_goal = $3, updated_at = NOW()
-             WHERE user_id = $4
-             RETURNING *`,
-            [revenue_goal, new_clients_goal, deals_won_goal, userId]
-        );
-        res.status(200).json(updatedGoalsRes.rows[0]);
-    } catch (err) {
-        console.error('Error updating goals:', err);
-        res.status(500).json({ message: 'Server error while updating goals.' });
-    }
+    const { userId } = req.user;
+    const { revenue_goal, new_clients_goal, deals_won_goal } = req.body;
+    try {
+        const updatedGoalsRes = await pool.query(
+            `UPDATE user_goals
+             SET revenue_goal = $1, new_clients_goal = $2, deals_won_goal = $3, updated_at = NOW()
+             WHERE user_id = $4
+             RETURNING *`,
+            [revenue_goal, new_clients_goal, deals_won_goal, userId]
+        );
+        res.status(200).json(updatedGoalsRes.rows[0]);
+    } catch (err) {
+        console.error('Error updating goals:', err);
+        res.status(500).json({ message: 'Server error while updating goals.' });
+    }
 });
 
 
