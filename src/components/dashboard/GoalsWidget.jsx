@@ -5,8 +5,14 @@ import { useAuth } from '../../AuthContext';
 
 const formInputClasses = "w-full bg-slate-100 dark:bg-dark-primary-bg border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent-start dark:focus:ring-dark-accent-mid text-text-primary dark:text-dark-text-primary";
 
-const GoalProgressBar = ({ title, icon, current, goal }) => {
+// The GoalProgressBar component is updated to conditionally display the dollar sign
+const GoalProgressBar = ({ title, icon, current, goal, isMonetary = false }) => {
     const percentage = goal > 0 ? Math.min((current / goal) * 100, 100) : 0;
+    const formatValue = (value) => {
+        const formattedValue = Number(value).toLocaleString();
+        return isMonetary ? `$${formattedValue}` : formattedValue;
+    };
+    
     return (
         <div>
             <div className="flex justify-between items-center mb-1">
@@ -15,7 +21,7 @@ const GoalProgressBar = ({ title, icon, current, goal }) => {
                     <p className="font-semibold text-sm">{title}</p>
                 </div>
                 <p className="text-xs text-text-secondary dark:text-dark-text-secondary">
-                    <span className="font-bold text-text-primary dark:text-dark-text-primary">${Number(current).toLocaleString()}</span> / ${Number(goal).toLocaleString()}
+                    <span className="font-bold text-text-primary dark:text-dark-text-primary">{formatValue(current)}</span> / {formatValue(goal)}
                 </p>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
@@ -118,18 +124,21 @@ export const GoalsWidget = ({ dashboardData }) => {
                             icon={<DollarSign size={16} className="text-green-500"/>}
                             current={dashboardData?.metrics.monthlyRevenue || 0}
                             goal={goals.revenue_goal}
+                            isMonetary={true}
                         />
                         <GoalProgressBar 
                             title="New Clients"
                             icon={<Users size={16} className="text-blue-500"/>}
                             current={dashboardData?.metrics.newClientsThisMonth || 0}
                             goal={goals.new_clients_goal}
+                            isMonetary={false}
                         />
                         <GoalProgressBar 
                             title="Deals Won"
                             icon={<CheckCircle size={16} className="text-purple-500"/>}
                             current={dashboardData?.metrics.dealsWonThisMonth || 0}
                             goal={goals.deals_won_goal}
+                            isMonetary={false}
                         />
                     </>
                 )}
