@@ -491,6 +491,11 @@ const initializeDatabase = async () => {
         ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE;
         ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMPTZ;
     `;
+
+    const addNotificationColumn = `
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_notified BOOLEAN DEFAULT FALSE;
+    `;
+
     const adminEmail = 'damilolasoaga@gmail.com';
     const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'ChangeThisPassword123!';
     const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -506,6 +511,7 @@ const initializeDatabase = async () => {
     try {
         await pool.query(addMissingUserColumns);
         await pool.query(addScheduledContentColumns);
+        await pool.query(addNotificationColumn);
         await pool.query(userTableQuery);
         // await pool.query(waitlistTableQuery);
         await pool.query(clientsTableQuery);
@@ -1852,6 +1858,23 @@ app.put('/api/tasks/:taskId', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
+    }
+});
+
+// PUT endpoint to mark all overdue/upcoming tasks as read
+app.put('/api/tasks/mark-as-read', authenticateToken, async (req, res) => {
+    const { userId } = req.user;
+    try {
+        await pool.query(
+            `UPDATE tasks 
+             SET is_notified = TRUE 
+             WHERE user_id = $1 AND is_deleted = FALSE AND status = 'incomplete' AND due_date IS NOT NULL`,
+            [userId]
+        );
+        res.status(200).json({ message: 'Notifications marked as read.' });
+    } catch (err) {
+        console.error('Error marking notifications as read:', err);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 

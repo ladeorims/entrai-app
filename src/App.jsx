@@ -1,4 +1,4 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
@@ -201,6 +201,19 @@ const PrivateLayout = ({ children }) => {
             console.error("Failed to fetch notifications:", error);
         }
     }, [token]);
+
+    const handleMarkAllAsRead = async () => {
+        if (!token || notifications.length === 0) return;
+        try {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks/mark-as-read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setNotifications([]);
+        } catch (error) {
+            console.error("Failed to mark notifications as read:", error);
+        }
+    };
  
     useEffect(() => {
         fetchNotifications();
@@ -301,14 +314,23 @@ const PrivateLayout = ({ children }) => {
                                         <h3 className={`font-semibold`}>Notifications</h3>
                                         <button onClick={() => setIsNotificationsOpen(false)} className="text-text-secondary dark:text-dark-text-secondary hover:text-text-primary dark:hover:text-dark-text-primary"><XCircle size={20} /></button>
                                     </div>
-                                    <div className="max-h-96 overflow-y-auto">
-                                        {notifications.length > 0 ? notifications.map(notif => (
-                                            <div key={notif.id} className="p-4 hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer border-b border-slate-200 dark:border-slate-800">
-                                                <p className="font-semibold text-sm">{notif.title}</p>
-                                                <p className="text-xs text-text-secondary dark:text-dark-text-secondary mt-1">Due on {new Date(notif.dueDate).toLocaleDateString()}</p>
+                                    {notifications.length > 0 ? (
+                                        <>
+                                            <div className="max-h-96 overflow-y-auto">
+                                                {notifications.map(notif => (
+                                                    <div key={notif.id} className="p-4 hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer border-b border-slate-200 dark:border-slate-800">
+                                                        <p className="font-semibold text-sm">{notif.title}</p>
+                                                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary mt-1">Due on {new Date(notif.dueDate).toLocaleDateString()}</p>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        )) : <p className="text-center text-text-secondary py-8">No new notifications.</p>}
-                                    </div>
+                                            <div className="p-2 border-t border-slate-200 dark:border-slate-800">
+                                                <button onClick={handleMarkAllAsRead} className="w-full text-sm font-semibold text-accent-start dark:text-dark-accent-mid hover:opacity-80">Mark All as Read</button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="text-center text-text-secondary py-8">No new notifications.</p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -340,7 +362,6 @@ const App = () => {
     );
   }
 
-  // All other routes are wrapped in the AuthProvider
   return (
     <AuthProvider>
       <AppRoutes />
@@ -367,9 +388,9 @@ const AppRoutes = () => {
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
           {/* <Route path="/waitlist" element={<WaitlistPage />} /> */}
           <Route path="/auth" element={isAuthenticated ? <Navigate to="/dashboard" /> : <AuthPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/reset-password" element={isAuthenticated ? <Navigate to="/dashboard" /> : <ResetPasswordPage />} />
           <Route path="/features" element={isAuthenticated ? <Navigate to="/dashboard" /> : <FeaturesPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/pricing" element={isAuthenticated ? <Navigate to="/dashboard" /> : <PricingPage />} />
           <Route path="/how-it-works" element={isAuthenticated ? <Navigate to="/dashboard" /> : <HowItWorksPage />} />
           <Route path="/about" element={isAuthenticated ? <Navigate to="/dashboard" /> : <AboutPage />} />
           <Route path="/careers" element={isAuthenticated ? <Navigate to="/dashboard" /> : <CareersPage />} />

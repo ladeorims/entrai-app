@@ -8,10 +8,11 @@ import { ClientDealModal } from '../components/modals/ClientDealModal';
 import { NewCampaignModal } from '../components/modals/NewCampaignModal';
 import { AskAIModal } from '../components/modals/AskAIModal';
 import { GoalsWidget } from '../components/dashboard/GoalsWidget';
-import BrandedLoader from '../components/BrandedLoader'; // Import the branded loader
+import BrandedLoader from '../components/BrandedLoader';
+import CustomModal from '../components/ui/CustomModal';
 import { useAuth } from '../AuthContext';
 
-const BusinessHealthGauge = ({ score }) => {
+const BusinessHealthGauge = ({ score, onInfoClick }) => {
     const getStatus = (s) => {
         if (s >= 75) return { label: "You're on track", color: "text-green-500" };
         if (s >= 50) return { label: "Things are steady", color: "text-yellow-500" };
@@ -41,7 +42,7 @@ const BusinessHealthGauge = ({ score }) => {
             <div className="text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start gap-2">
                     <p className="text-text-secondary dark:text-dark-text-secondary text-lg">Business Health Score</p>
-                    <Info size={16} className="text-text-secondary dark:text-dark-text-secondary cursor-pointer hover:opacity-70" />
+                    <Info size={16} className="text-text-secondary dark:text-dark-text-secondary cursor-pointer hover:opacity-70" onClick={onInfoClick} />
                 </div>
                 <p className="text-6xl font-bold text-text-primary dark:text-dark-text-primary my-1">{score}</p>
                 <p className={`font-semibold ${status.color}`}>{status.label}</p>
@@ -66,6 +67,7 @@ const Dashboard = () => {
     const [isClientDealModalOpen, setIsClientDealModalOpen] = useState(false);
     const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
     const [isAskAIModalOpen, setIsAskAIModalOpen] = useState(false);
+    const [isHealthScoreModalOpen, setIsHealthScoreModalOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         if (!token) { setIsLoading(false); return; }
@@ -134,8 +136,8 @@ const Dashboard = () => {
             }
         } catch (error) {
             console.error('Error updating task:', error);
-            setTasks(originalTasks); // Revert the change on error
-            fetchData(); // Fetch the latest state from the server
+            setTasks(originalTasks);
+            fetchData();
         }
     };
 
@@ -149,13 +151,30 @@ const Dashboard = () => {
         );
     }
 
+    const healthScoreExplanation = `
+The Business Health Score is a high-level indicator (out of 100) of your business's performance. It's calculated based on three weighted metrics:
+\n\n
+- Monthly Revenue: Up to 50 points, based on a $5,000 monthly goal.
+- Sales Pipeline Value: Up to 30 points, based on a $10,000 pipeline goal.
+- Operational Efficiency: Up to 20 points, based on the number of upcoming tasks.
+\n\n
+A score of 75+ is considered 'On Track.'
+`;
+
     return (
         <div className="animate-fade-in space-y-8">
             {isAddTaskModalOpen && <AddTaskModal token={token} onClose={() => setIsAddTaskModalOpen(false)} onTaskAdded={fetchData} />}
             {isCreateInvoiceModalOpen && <CreateInvoiceModal token={token} user={user} clients={clients} onClose={() => setIsCreateInvoiceModalOpen(false)} onInvoiceCreated={fetchData} />}
             {isClientDealModalOpen && <ClientDealModal token={token} clients={clients} onClose={() => setIsClientDealModalOpen(false)} onSuccess={fetchData} defaultToNewClient={true} />}
             {isNewCampaignModalOpen && <NewCampaignModal token={token} onClose={() => setIsNewCampaignModalOpen(false)} onCampaignAdded={fetchData} />}
-            {isAskAIModalOpen && <AskAIModal token={token} onClose={() => setIsAskAIModalOpen(false)} />}
+            {isAskAIModalOpen && <AskAIModal onClose={() => setIsAskAIModalOpen(false)} />}
+            {isHealthScoreModalOpen && (
+                <CustomModal
+                    title="Business Health Score"
+                    message={healthScoreExplanation}
+                    onClose={() => setIsHealthScoreModalOpen(false)}
+                />
+            )}
             
             <header>
                 <h1 className="text-3xl font-bold">{greeting}</h1>
@@ -167,7 +186,7 @@ const Dashboard = () => {
                     <GoalsWidget token={token} dashboardData={dashboardData} />
                     <Card>
                         <h2 className="text-xl font-bold mb-4">Business Health</h2>
-                        <BusinessHealthGauge score={dashboardData.healthScore} />
+                        <BusinessHealthGauge score={dashboardData.healthScore} onInfoClick={() => setIsHealthScoreModalOpen(true)} />
                     </Card>
                     <Card>
                         <div className="flex justify-between items-center mb-4">
