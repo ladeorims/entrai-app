@@ -273,14 +273,14 @@ const initializeDatabase = async () => {
         )
     `;
 
-    const waitlistTableQuery = `
-        CREATE TABLE IF NOT EXISTS waitlist (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+    // const waitlistTableQuery = `
+    //     CREATE TABLE IF NOT EXISTS waitlist (
+    //         id SERIAL PRIMARY KEY,
+    //         name VARCHAR(255) NOT NULL,
+    //         email VARCHAR(255) UNIQUE NOT NULL,
+    //         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    //     )
+    // `;
 
     const clientsTableQuery = `
         CREATE TABLE IF NOT EXISTS clients (
@@ -489,7 +489,11 @@ const initializeDatabase = async () => {
     const adminUserQuery = `
         INSERT INTO users (name, email, password, role, is_verified)
         VALUES ('Admin', $1, $2, 'admin', TRUE)
-        ON CONFLICT (email) DO UPDATE SET role = 'admin', password = $2;
+        ON CONFLICT (email) DO NOTHING;
+    `;
+
+    const updateAdminPasswordQuery = `
+        UPDATE users SET password = $1 WHERE email = $2 AND password != $1;
     `;
 
         const addMissingUserColumns = `
@@ -503,7 +507,7 @@ const initializeDatabase = async () => {
     try {
         await pool.query(addMissingUserColumns);
         await pool.query(userTableQuery);
-        await pool.query(waitlistTableQuery);
+        // await pool.query(waitlistTableQuery);
         await pool.query(clientsTableQuery);
         await pool.query(salesDealsTableQuery);
         await pool.query(dealNotesTableQuery);
@@ -524,6 +528,8 @@ const initializeDatabase = async () => {
         await pool.query(addInviteTokenToUsersQuery);
         await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
         console.log(`Admin user for ${adminEmail} ensured with 'admin' role.`);
+        await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
+
         console.log('All tables created or already exist.');
         console.log('Schema updates successful.');
     } catch (err) {
@@ -785,46 +791,46 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/profile', authenticateToken, async (req, res) => {
-    const { name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal } = req.body;
-    const { userId } = req.user;
-    try {
-        const result = await pool.query(
-            `UPDATE users SET
-                name = $1, company = $2, phone_number = $3, profile_picture_url = $4,
-                company_description = $5, company_logo_url = $6, address = $7, city_province_postal = $8
-             WHERE id = $9 RETURNING *`,
-            [name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal, userId]
-        );
-        const updatedUser = result.rows[0];
-        const newToken = jwt.sign(
-            { userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-        const userPayload = {
-            id: updatedUser.id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            company: updatedUser.company,
-            phoneNumber: updatedUser.phone_number,
-            profilePictureUrl: updatedUser.profile_picture_url,
-            companyDescription: updatedUser.company_description,
-            companyLogoUrl: updatedUser.company_logo_url,
-            address: updatedUser.address,
-            cityProvincePostal: updatedUser.city_province_postal,
-            planType: updatedUser.plan_type,
-            subscriptionStatus: updatedUser.subscription_status,
-            subscriptionStartDate: updatedUser.subscription_start_date
-        };
-        res.status(200).json({
-            message: 'Profile updated successfully.',
-            token: newToken,
-            user: userPayload
-        });
-    } catch (err) {
-        console.error('Error updating profile:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal } = req.body;
+    const { userId } = req.user;
+    try {
+        const result = await pool.query(
+            `UPDATE users SET
+                name = $1, company = $2, phone_number = $3, profile_picture_url = $4,
+                company_description = $5, company_logo_url = $6, address = $7, city_province_postal = $8
+             WHERE id = $9 RETURNING *`,
+            [name, company, phoneNumber, profilePictureUrl, companyDescription, companyLogoUrl, address, cityProvincePostal, userId]
+        );
+        const updatedUser = result.rows[0];
+        const newToken = jwt.sign(
+            { userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        const userPayload = {
+            id: updatedUser.id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            company: updatedUser.company,
+            phoneNumber: updatedUser.phone_number,
+            profilePictureUrl: updatedUser.profile_picture_url,
+            companyDescription: updatedUser.company_description,
+            companyLogoUrl: updatedUser.company_logo_url,
+            address: updatedUser.address,
+            cityProvincePostal: updatedUser.city_province_postal,
+            planType: updatedUser.plan_type,
+            subscriptionStatus: updatedUser.subscription_status,
+            subscriptionStartDate: updatedUser.subscription_start_date
+        };
+        res.status(200).json({
+            message: 'Profile updated successfully.',
+            token: newToken,
+            user: userPayload
+        });
+    } catch (err) {
+        console.error('Error updating profile:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.put('/api/profile/onboarding', authenticateToken, async (req, res) => {
