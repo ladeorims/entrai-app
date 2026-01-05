@@ -275,15 +275,6 @@ const initializeDatabase = async () => {
         )
     `;
 
-    // const waitlistTableQuery = `
-    //     CREATE TABLE IF NOT EXISTS waitlist (
-    //         id SERIAL PRIMARY KEY,
-    //         name VARCHAR(255) NOT NULL,
-    //         email VARCHAR(255) UNIQUE NOT NULL,
-    //         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    //     )
-    // `;
-
     const clientsTableQuery = `
         CREATE TABLE IF NOT EXISTS clients (
             id SERIAL PRIMARY KEY,
@@ -409,59 +400,6 @@ const initializeDatabase = async () => {
         )
     `;
 
-    const automationsTableQuery = `
-        CREATE TABLE IF NOT EXISTS automations (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            name VARCHAR(255) NOT NULL,
-            trigger_type VARCHAR(100) NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
-
-    const automationActionsTableQuery = `
-        CREATE TABLE IF NOT EXISTS automation_actions (
-            id SERIAL PRIMARY KEY,
-            automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
-            action_type VARCHAR(100) NOT NULL,
-            params JSONB
-        )
-    `;
-
-    const clientInteractionsTableQuery = `
-        CREATE TABLE IF NOT EXISTS client_interactions (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            deal_id INTEGER REFERENCES sales_deals(id) ON DELETE SET NULL,
-            type VARCHAR(50) NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
-
-    const intakeFormsTableQuery = `
-        CREATE TABLE IF NOT EXISTS intake_forms (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            questions JSONB NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id)
-        )
-    `;
-
-    const formSubmissionsTableQuery = `
-        CREATE TABLE IF NOT EXISTS form_submissions (
-            id SERIAL PRIMARY KEY,
-            form_id INTEGER NOT NULL REFERENCES intake_forms(id) ON DELETE CASCADE,
-            responses JSONB NOT NULL,
-            client_name VARCHAR(255),
-            client_email VARCHAR(255),
-            submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
-
     const userGoalsTableQuery = `
         CREATE TABLE IF NOT EXISTS user_goals (
             id SERIAL PRIMARY KEY,
@@ -474,70 +412,44 @@ const initializeDatabase = async () => {
         )
     `;
 
-    const alterTransactionsQuery = `
-        ALTER TABLE transactions
-        ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'
-    `;
-    
-    const addMissingUserColumns = `
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
-    `;
-    const addScheduledContentColumns = `
-        ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE;
-        ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMPTZ;
-    `;
-
-    const addNotificationColumn = `
-        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_notified BOOLEAN DEFAULT FALSE;
-    `;
-
-    const adminEmail = 'damilolasoaga@gmail.com';
-    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'ChangeThisPassword123!';
-    const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
-    const adminUserQuery = `
-        INSERT INTO users (name, email, password, role, is_verified)
-        VALUES ('Admin', $1, $2, 'admin', TRUE)
-        ON CONFLICT (email) DO NOTHING;
-    `;
-    const updateAdminPasswordQuery = `
-        UPDATE users SET password = $1 WHERE email = $2 AND password != $1;
-    `;
-
+    // 2. RUN QUERIES IN ORDER
     try {
-          await pool.query(userTableQuery);
+        // First: Create all fundamental tables
+        await pool.query(userTableQuery);
+        await pool.query(clientsTableQuery);
+        await pool.query(salesDealsTableQuery);
+        await pool.query(dealNotesTableQuery);
+        await pool.query(tasksTableQuery);
+        await pool.query(transactionsTableQuery);
+        await pool.query(campaignsTableQuery);
+        await pool.query(contentCalendarTableQuery);
+        await pool.query(invoicesTableQuery);
+        await pool.query(invoiceLineItemsTableQuery);
+        await pool.query(userGoalsTableQuery);
 
-  await pool.query(addMissingUserColumns);
-  await pool.query(addScheduledContentColumns);
-  await pool.query(addNotificationColumn);
+        // Second: Run Alterations ONLY after tables are guaranteed to exist
+        await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'business'`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(255) UNIQUE`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user'`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE`);
+        await pool.query(`ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE`);
+        await pool.query(`ALTER TABLE content_calendar ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMPTZ`);
+        await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_notified BOOLEAN DEFAULT FALSE`);
 
-  await pool.query(clientsTableQuery);
-  await pool.query(salesDealsTableQuery);
-  await pool.query(dealNotesTableQuery);
-  await pool.query(tasksTableQuery);
-  await pool.query(transactionsTableQuery);
-  await pool.query(campaignsTableQuery);
-  await pool.query(contentCalendarTableQuery);
-  await pool.query(invoicesTableQuery);
-  await pool.query(invoiceLineItemsTableQuery);
-  await pool.query(automationsTableQuery);
-  await pool.query(automationActionsTableQuery);
-  await pool.query(clientInteractionsTableQuery);
-  await pool.query(intakeFormsTableQuery);
-  await pool.query(formSubmissionsTableQuery);
-  await pool.query(userGoalsTableQuery);
-  await pool.query(alterTransactionsQuery);
+        // Third: Ensure Admin User
+        const adminEmail = 'damilolasoaga@gmail.com';
+        const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'ChangeThisPassword123!';
+        const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
+        
+        await pool.query(`
+            INSERT INTO users (name, email, password, role, is_verified)
+            VALUES ('Admin', $1, $2, 'admin', TRUE)
+            ON CONFLICT (email) DO NOTHING
+        `, [adminEmail, adminHashedPassword]);
 
-  await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
-  await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
-        console.log(`Admin user for ${adminEmail} ensured with 'admin' role.`);
-        await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
-
-        console.log('All tables created or already exist.');
-        console.log('Schema updates successful.');
+        console.log('Database initialized successfully.');
     } catch (err) {
         console.error('Error during database initialization:', err);
         throw err;
