@@ -1,4 +1,4 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useState, useRef } from 'react';
 import Card from './ui/Card';
 import { useAuth } from '../AuthContext';

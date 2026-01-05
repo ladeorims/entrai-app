@@ -1,4 +1,4 @@
-/* eslint-disable no-irregular-whitespace */
+// /* eslint-disable no-irregular-whitespace */
 import React, { useState } from 'react';
 import Card from '../ui/Card';
 import { XCircle, KeyRound, Power, Loader2, CheckCircle, ShieldCheck, Save, Trash2, AlertTriangle } from 'lucide-react';

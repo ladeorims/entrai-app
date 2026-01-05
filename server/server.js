@@ -208,7 +208,6 @@ const generateInvoicePDF = async (invoiceId, userId) => {
     
     // --- THIS IS THE CORRECTED LINE ---
     doc.autoTable({ head: [tableColumn], body: tableRows, startY: 85, theme: 'striped' });
-
     const finalY = doc.lastAutoTable.finalY || 150;
     doc.setFontSize(12);
     doc.text(`Subtotal: $${(invoice.total_amount - invoice.tax_amount).toFixed(2)}`, 200, finalY + 15, { align: 'right' });
@@ -509,28 +508,31 @@ const initializeDatabase = async () => {
     `;
 
     try {
-        await pool.query(addMissingUserColumns);
-        await pool.query(addScheduledContentColumns);
-        await pool.query(addNotificationColumn);
-        await pool.query(userTableQuery);
-        // await pool.query(waitlistTableQuery);
-        await pool.query(clientsTableQuery);
-        await pool.query(salesDealsTableQuery);
-        await pool.query(dealNotesTableQuery);
-        await pool.query(tasksTableQuery);
-        await pool.query(transactionsTableQuery);
-        await pool.query(campaignsTableQuery);
-        await pool.query(contentCalendarTableQuery);
-        await pool.query(invoicesTableQuery);
-        await pool.query(invoiceLineItemsTableQuery);
-        await pool.query(automationsTableQuery);
-        await pool.query(automationActionsTableQuery);
-        await pool.query(clientInteractionsTableQuery);
-        await pool.query(intakeFormsTableQuery);
-        await pool.query(formSubmissionsTableQuery);
-        await pool.query(userGoalsTableQuery);
-        await pool.query(alterTransactionsQuery);
-        await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
+          await pool.query(userTableQuery);
+
+  await pool.query(addMissingUserColumns);
+  await pool.query(addScheduledContentColumns);
+  await pool.query(addNotificationColumn);
+
+  await pool.query(clientsTableQuery);
+  await pool.query(salesDealsTableQuery);
+  await pool.query(dealNotesTableQuery);
+  await pool.query(tasksTableQuery);
+  await pool.query(transactionsTableQuery);
+  await pool.query(campaignsTableQuery);
+  await pool.query(contentCalendarTableQuery);
+  await pool.query(invoicesTableQuery);
+  await pool.query(invoiceLineItemsTableQuery);
+  await pool.query(automationsTableQuery);
+  await pool.query(automationActionsTableQuery);
+  await pool.query(clientInteractionsTableQuery);
+  await pool.query(intakeFormsTableQuery);
+  await pool.query(formSubmissionsTableQuery);
+  await pool.query(userGoalsTableQuery);
+  await pool.query(alterTransactionsQuery);
+
+  await pool.query(adminUserQuery, [adminEmail, adminHashedPassword]);
+  await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
         console.log(`Admin user for ${adminEmail} ensured with 'admin' role.`);
         await pool.query(updateAdminPasswordQuery, [adminHashedPassword, adminEmail]);
 
@@ -2984,14 +2986,14 @@ app.post('/api/automations/send-subscription-reminders', async (req, res) => {
 // =========================================================================
 const startServer = async () => {
     try {
-        await pool.connect();
-        console.log('Database connected successfully.');
-        await initializeDatabase();
+        // This line runs the function that creates your tables
+        await initializeDatabase(); 
+
         app.listen(PORT, () => {
-            console.log(`Server is listening on http://localhost:${PORT} and is ready for requests.`);
+            console.log(`Server is running on port ${PORT}`);
         });
-    } catch (err) {
-        console.error('Failed to start server due to database error:', err);
+    } catch (error) {
+        console.error('Failed to start server due to database error:', error);
         process.exit(1);
     }
 };
