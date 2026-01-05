@@ -682,6 +682,21 @@ app.post('/api/reset-password', async (req, res) => {
     }
 });
 
+// TEMPORARY ROUTE: DELETE AFTER USE
+app.get('/api/admin/reset-database-danger', async (req, res) => {
+    try {
+        await pool.query(`
+            TRUNCATE users, clients, sales_deals, deal_notes, tasks, 
+            transactions, campaigns, content_calendar, invoices, 
+            invoice_line_items, user_goals 
+            RESTART IDENTITY CASCADE
+        `);
+        res.send("<h1>Database Wiped!</h1><p>All users and data have been deleted and IDs reset to 1. Please delete this code from server.js now.</p>");
+    } catch (err) {
+        res.status(500).send("Error wiping database: " + err.message);
+    }
+});
+
 app.get('/api/profile', authenticateToken, async (req, res) => {
     const { userId } = req.user;
     try {
