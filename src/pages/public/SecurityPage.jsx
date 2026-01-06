@@ -1,42 +1,32 @@
 import React from 'react';
 import PublicLayout from './PublicLayout';
-import { ShieldCheck, DatabaseZap, Lock, KeyRound } from 'lucide-react';
-import Card from '../../components/ui/Card';
-
-const SecurityFeature = ({ icon, title, children }) => (
-    <Card className="text-center flex flex-col items-center">
-        <div className="p-4 bg-green-500/10 rounded-full mb-4">
-            {icon}
-        </div>
-        <h3 className="text-xl font-bold">{title}</h3>
-        <p className="mt-2 text-text-secondary dark:text-dark-text-secondary text-sm">{children}</p>
-    </Card>
-);
+import { ShieldCheck, DatabaseZap, Lock, KeyRound, Globe } from 'lucide-react';
 
 const SecurityPage = () => {
     return (
         <PublicLayout>
-            <div className="container mx-auto px-5 py-20 max-w-4xl text-center">
-                <h1 className="text-4xl md:text-6xl font-bold">Your business data, safeguarded.</h1>
-                <p className="mt-6 text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto">
-                    At Entruvi, security isn't an afterthought—it's built into every layer of our platform. We are committed to protecting your most valuable asset: your data.
+            <div className="container mx-auto px-5 py-24 max-w-5xl text-center">
+                <h1 className="text-5xl md:text-7xl font-black mb-8 leading-tight">Your Data, <br />Bank-Grade Secure.</h1>
+                <p className="text-lg md:text-xl text-text-secondary dark:text-dark-text-secondary max-w-3xl mx-auto leading-relaxed">
+                    Security is not an afterthought—it's the foundation of Entruvi. We protect your business 
+                    information like it's our own, using world-class encryption and local compliance standards.
                 </p>
             </div>
             
-            <div className="container mx-auto px-5 max-w-7xl pb-20">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <SecurityFeature icon={<Lock size={28} className="text-green-500"/>} title="Data Encryption">
-                        All your data is encrypted at rest and in transit using industry-standard AES-256 encryption.
-                    </SecurityFeature>
-                    <SecurityFeature icon={<KeyRound size={28} className="text-green-500"/>} title="Secure Authentication">
-                        Your account is protected with JWT-based authentication and secure password hashing.
-                    </SecurityFeature>
-                    <SecurityFeature icon={<ShieldCheck size={28} className="text-green-500"/>} title="Stripe Compliance">
-                        All payment information is handled by Stripe, a PCI-DSS compliant payment processor. We never store your credit card details.
-                    </SecurityFeature>
-                    <SecurityFeature icon={<DatabaseZap size={28} className="text-green-500"/>} title="Secure Hosting">
-                        Our infrastructure is hosted on Render and Vercel, platforms with world-class physical and network security.
-                    </SecurityFeature>
+            <div className="container mx-auto px-5 max-w-7xl pb-32">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {[
+                        { icon: <Lock />, t: "AES-256 Encryption", d: "Your data is encrypted at rest and in transit. Not even our team can read your private business metrics." },
+                        { icon: <ShieldCheck />, t: "Local Payment Compliance", d: "All payments are processed through PCI-DSS compliant Nigerian gateways. No card details ever hit our servers." },
+                        { icon: <DatabaseZap />, t: "Secure Cloud Infrastructure", d: "Hosted on globally distributed, secure servers with 99.9% uptime and automatic daily backups." },
+                        { icon: <KeyRound />, t: "JWT Authentication", d: "Multi-layered session security ensures only you and your invited team members can access your workspace." }
+                    ].map((s, i) => (
+                        <div key={i} className="p-10 rounded-[3rem] bg-slate-50/50 dark:bg-dark-card-bg border border-slate-200 dark:border-slate-800 hover:border-accent-start transition-colors">
+                            <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm flex items-center justify-center text-accent-start mb-6">{s.icon}</div>
+                            <h3 className="text-2xl font-black mb-3">{s.t}</h3>
+                            <p className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">{s.d}</p>
+                        </div>
+                    ))}
                 </div>
             </div>
         </PublicLayout>

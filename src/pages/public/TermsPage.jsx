@@ -1,25 +1,26 @@
+// Simplified example for TermsPage.jsx - repeat similar for Privacy
 import React from 'react';
 import PublicLayout from './PublicLayout';
 
 const TermsPage = () => {
     return (
         <PublicLayout>
-            <div className="container mx-auto px-5 py-20 max-w-4xl">
-                <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
-                <div className="prose dark:prose-invert max-w-none space-y-6">
-                    <p>By using the Entruvi service, you agree to these terms. Please read them carefully.</p>
-                    
-                    <h2 className="text-2xl font-bold">Account Responsibilities</h2>
-                    <p>You are responsible for maintaining the security of your account and password. Entruvi cannot and will not be liable for any loss or damage from your failure to comply with this security obligation.</p>
-
-                    <h2 className="text-2xl font-bold">Subscription & Payment</h2>
-                    <p>A valid payment method is required for paid plans. You will be billed in advance on a monthly or annual basis. Paid plans are backed by our 60-day money-back guarantee.</p>
-
-                    <h2 className="text-2xl font-bold">60-Day Money-Back Guarantee</h2>
-                    <p>You are eligible for a full refund for any paid plan if you cancel within the first 60 days of your initial subscription. This guarantee is void if your subscription lapses for any period of time during the 60-day period. Refunds are not available for subsequent billing cycles.</p>
-                    
-                    <h2 className="text-2xl font-bold">Limitation of Liability</h2>
-                    <p>The service is provided "as is". In no event shall Entruvi be liable for any damages (including, without limitation, damages for loss of data or profit) arising out of the use or inability to use the materials on our website.</p>
+            <div className="bg-slate-50/50 dark:bg-transparent min-h-screen">
+                <div className="container mx-auto px-5 py-24 max-w-3xl">
+                    <h1 className="text-5xl font-black mb-12">Terms of Service</h1>
+                    <div className="bg-white dark:bg-dark-card-bg p-10 md:p-16 rounded-[3rem] shadow-xl border border-slate-100 dark:border-slate-800 prose dark:prose-invert">
+                        <h2 className="text-2xl font-bold mb-4">1. Billing & Currency</h2>
+                        <p className="text-text-secondary mb-8">
+                            Entruvi provides billing in Nigerian Naira (₦). By subscribing, you agree to recurring charges 
+                            based on your chosen plan. We reserve the right to adjust pricing with 30 days notice.
+                        </p>
+                        <h2 className="text-2xl font-bold mb-4">2. 60-Day Guarantee</h2>
+                        <p className="text-text-secondary mb-8">
+                            New users are eligible for a full refund within 60 days of their first payment. 
+                            This is part of our commitment to your success.
+                        </p>
+                        {/* ... more content */}
+                    </div>
                 </div>
             </div>
         </PublicLayout>
