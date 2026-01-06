@@ -24,15 +24,41 @@ const LandingPage = () => {
                             <a href="#demo" className="bg-slate-200 dark:bg-slate-800 text-text-primary dark:text-dark-text-primary font-semibold px-6 py-3 rounded-xl transition hover:bg-slate-300 dark:hover:bg-slate-700">See It in Action</a>
                         </div>
                     </div>
-                    <div className="hidden md:block bg-gradient-to-b from-slate-100 to-slate-200/50 dark:from-slate-800 dark:to-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg p-4">
-                        <div className="flex items-center gap-2 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700 mb-3">
-                            <div className="flex gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i><i className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></i></div>
-                            <div className="font-bold text-text-secondary dark:text-dark-text-secondary text-sm">Entruvi • Dashboard</div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3.5">
-                            <div className="bg-card-bg dark:bg-dark-card-bg border border-slate-200 dark:border-slate-700 rounded-xl p-3.5"><div className="text-sm text-text-secondary dark:text-dark-text-secondary">Business Health</div><div className="text-3xl font-extrabold mt-1">82<span className="text-sm font-semibold text-green-500">/100</span></div></div>
-                            <div className="bg-card-bg dark:bg-dark-card-bg border border-slate-200 dark:border-slate-700 rounded-xl p-3.5"><div className="text-sm text-text-secondary dark:text-dark-text-secondary">This Week</div><div className="text-2xl font-bold mt-1 text-green-500">+$1,250</div></div>
-                            <div className="bg-card-bg dark:bg-dark-card-bg border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 col-span-2"><div className="text-sm text-text-secondary dark:text-dark-text-secondary">AI Suggestion</div><div className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mt-1.5 leading-snug">"Follow up with the 'Innovate Inc.' deal to keep momentum."</div></div>
+                   <div className="relative group">
+                        <div className="absolute -inset-4 bg-gradient-to-r from-accent-start/20 to-accent-end/20 blur-2xl rounded-full opacity-50"></div>
+                        <div className="relative bg-white dark:bg-dark-card-bg border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 scale-100 group-hover:scale-[1.02] transition-transform duration-500 overflow-hidden">
+                            {/* Mock Health Gauge */}
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Business Health</h3>
+                                    <p className="text-2xl font-black text-green-500">84% - Excellent</p>
+                                </div>
+                                <div className="w-16 h-16 rounded-full border-4 border-slate-100 dark:border-slate-800 border-t-green-500 rotate-45 flex items-center justify-center">
+                                    <span className="text-xs font-bold -rotate-45">84</span>
+                                </div>
+                            </div>
+
+                            {/* Mock Income/Expense Cards */}
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="p-4 bg-slate-50 dark:bg-dark-primary-bg rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <p className="text-xs text-text-secondary uppercase">Income</p>
+                                    <p className="text-lg font-bold text-accent-start">$12,450</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 dark:bg-dark-primary-bg rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <p className="text-xs text-text-secondary uppercase">Expenses</p>
+                                    <p className="text-lg font-bold text-red-500">$3,210</p>
+                                </div>
+                            </div>
+
+                            {/* Mock AI Recommendations */}
+                            <div className="space-y-3">
+                                <div className="h-2 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full"></div>
+                                <div className="flex gap-2 mt-4">
+                                    <div className="h-8 w-24 bg-accent-start/10 rounded-lg border border-accent-start/20"></div>
+                                    <div className="h-8 w-24 bg-slate-100 dark:bg-slate-800 rounded-lg"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>

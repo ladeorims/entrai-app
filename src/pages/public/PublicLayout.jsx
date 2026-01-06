@@ -14,7 +14,10 @@ const PublicHeader = () => {
     const { pathname } = useLocation();
 
     useEffect(() => {
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Check localStorage first, otherwise default to Light (false)
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = savedTheme === 'dark';
+        
         setIsDarkMode(prefersDark);
         if (prefersDark) {
             document.documentElement.classList.add('dark');
@@ -72,9 +75,25 @@ const PublicHeader = () => {
                 <div className="md:hidden flex items-center"><button onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <X size={24} /> : <Menu size={24} />}</button></div>
             </div>
             {isMenuOpen && (
-                <div className="md:hidden absolute top-full left-0 w-full bg-card-bg dark:bg-dark-card-bg shadow-lg">
+                <><div className="md:hidden absolute top-full left-0 w-full bg-card-bg dark:bg-dark-card-bg shadow-lg">
                     <nav className="flex flex-col items-start p-4 text-text-secondary dark:text-dark-text-secondary font-semibold">{navLinks}</nav>
                 </div>
+                   
+                    <div className="flex flex-col gap-4 mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                            onClick={() => navigate('/auth')}
+                            className="w-full py-3 text-center font-semibold text-text-primary dark:text-dark-text-primary"
+                        >
+                            Sign In
+                        </button>
+                        <button
+                            onClick={() => navigate('/auth')}
+                            className="w-full py-3 text-center font-bold text-white bg-gradient-to-r from-accent-start to-accent-end rounded-xl shadow-lg"
+                        >
+                            Get Started
+                        </button>
+                    </div></>
+                
             )}
         </header>
     );
@@ -92,7 +111,7 @@ const PublicFooter = () => {
             <div className="container mx-auto px-5 py-16 max-w-7xl">
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
                     <div className="col-span-2 lg:col-span-2">
-                        <h3 className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end dark:from-dark-accent-start dark:to-dark-accent-end text-transparent bg-clip-text mb-3">Entruvi</h3>
+                        <h3 className="font-black text-lg mb-6 bg-gradient-to-r from-accent-start to-accent-end text-transparent bg-clip-text">Entruvi</h3>
                         <p className="text-text-secondary dark:text-dark-text-secondary text-sm max-w-xs">Your virtual COO. Less admin, more growth. Empowering visionaries to focus on what matters.</p>
                     </div>
                     <div>

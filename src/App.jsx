@@ -175,15 +175,20 @@ const PrivateLayout = ({ children }) => {
     const notificationRef = useRef(null);
     const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [isDarkMode, setIsDarkMode] = useState(false);
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
- 
+    
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        // Default to Light (false) unless 'dark' is explicitly saved
+        return localStorage.getItem('theme') === 'dark';
+    });
+
     useEffect(() => {
-        const root = window.document.documentElement;
         if (isDarkMode) {
-            root.classList.add('dark');
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
         } else {
-            root.classList.remove('dark');
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
         }
     }, [isDarkMode]);
  
