@@ -178,7 +178,6 @@ const PrivateLayout = ({ children }) => {
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
     
     const [isDarkMode, setIsDarkMode] = useState(() => {
-        // Default to Light (false) unless 'dark' is explicitly saved
         return localStorage.getItem('theme') === 'dark';
     });
 
